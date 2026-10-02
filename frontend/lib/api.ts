@@ -14,7 +14,7 @@ export async function loadDemoDataset(): Promise<Dataset> {
   return res.json();
 }
 
-export async function uploadDatasetFile(file: File): Promise<Dataset> {
+export async function uploadDatasetFile(file: File): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
   const res = await fetch(`${API_BASE}/datasets/upload`, {
@@ -28,7 +28,14 @@ export async function uploadDatasetFile(file: File): Promise<Dataset> {
   return res.json();
 }
 
+export async function fetchAllDatasetsOverview(): Promise<AllDatasetsOverview> {
+  const res = await fetch(`${API_BASE}/datasets/overview/all`);
+  if (!res.ok) throw new Error("Failed to fetch all datasets overview");
+  return res.json();
+}
+
 export async function fetchDatasetDetails(id: string): Promise<Dataset> {
+
   const res = await fetch(`${API_BASE}/datasets/${id}`);
   if (!res.ok) throw new Error("Failed to fetch dataset details");
   return res.json();

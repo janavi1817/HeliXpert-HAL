@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { uploadDatasetFile, loadDemoDataset } from "@/lib/api";
-import { Dataset } from "@/lib/types";
+import { Dataset, UploadResponse, ProcessedItem, FailedItem, UnsupportedItem } from "@/lib/types";
 import {
   X,
   UploadCloud,
@@ -11,6 +11,11 @@ import {
   AlertTriangle,
   Loader2,
   Database,
+  Archive,
+  FileText,
+  ImageIcon,
+  FolderArchive,
+  ArrowRight
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import clsx from "clsx";
@@ -23,11 +28,18 @@ interface DatasetUploadModalProps {
 }
 
 const PROGRESS_STEPS = [
-  "Uploading...",
-  "Analyzing schema...",
-  "Calculating statistics...",
-  "Preparing AI...",
+  "Uploading package...",
+  "Scanning files recursively...",
+  "Ingesting DuckDB tables & RAG...",
+  "Configuring dynamic analytics...",
   "Dataset ready!",
+];
+
+const ALLOWED_EXTS = [
+  ".csv", ".xlsx", ".xls", ".json", ".parquet",
+  ".pdf", ".txt", ".docx", ".md",
+  ".jpg", ".jpeg", ".png", ".webp",
+  ".zip"
 ];
 
 export default function DatasetUploadModal({
@@ -40,6 +52,7 @@ export default function DatasetUploadModal({
   const [uploadProgressIndex, setProgressIndex] = useState(-1);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [zipResult, setZipResult] = useState<UploadResponse | null>(null);
 
   if (!isOpen) return null;
 
@@ -58,9 +71,10 @@ export default function DatasetUploadModal({
 
   const handleFile = (file: File) => {
     setErrorMsg(null);
+    setZipResult(null);
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (![".csv", ".xlsx", ".xls", ".json", ".parquet"].includes(ext)) {
-      setErrorMsg(`Unsupported type '${ext}'. Use CSV, XLSX, JSON, or Parquet.`);
+    if (!ALLOWED_EXTS.includes(ext)) {
+      setErrorMsg(`Unsupported file type '${ext}'. Supported: CSV, XLSX, JSON, Parquet, PDF, TXT, DOCX, Images, ZIP.`);
       return;
     }
     if (file.size > 50 * 1024 * 1024) {
@@ -74,27 +88,43 @@ export default function DatasetUploadModal({
     setIsProcessing(true);
     setErrorMsg(null);
     setProgressIndex(0);
-    const iv = setInterval(() => setProgressIndex((p) => (p < 3 ? p + 1 : p)), 600);
+    const iv = setInterval(() => setProgressIndex((p) => (p < 3 ? p + 1 : p)), 500);
     try {
-      const dataset = await uploadDatasetFile(file);
+      const res: UploadResponse = await uploadDatasetFile(file);
       clearInterval(iv);
       setProgressIndex(4);
       try {
         confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
       } catch {}
-      setTimeout(() => {
-        onDatasetLoaded(dataset);
-        onClose();
+
+      if (res.is_zip || (res.processed && res.processed.length > 1)) {
         setIsProcessing(false);
         setProgressIndex(-1);
-        setSelectedFile(null);
-      }, 900);
+        setZipResult(res);
+      } else {
+        setTimeout(() => {
+          onDatasetLoaded(res);
+          onClose();
+          setIsProcessing(false);
+          setProgressIndex(-1);
+          setSelectedFile(null);
+        }, 800);
+      }
     } catch (err: any) {
       clearInterval(iv);
       setIsProcessing(false);
       setProgressIndex(-1);
       setErrorMsg(err.message || "Upload failed. Please try again.");
     }
+  };
+
+  const handleFinishZip = () => {
+    if (zipResult) {
+      onDatasetLoaded(zipResult);
+    }
+    onClose();
+    setZipResult(null);
+    setSelectedFile(null);
   };
 
   const handleLoadDemo = async () => {
@@ -112,13 +142,14 @@ export default function DatasetUploadModal({
         onClose();
         setIsProcessing(false);
         setProgressIndex(-1);
-      }, 800);
+      }, 700);
     } catch (err: any) {
       setIsProcessing(false);
       setProgressIndex(-1);
       setErrorMsg(err.message || "Failed to load demo dataset.");
     }
   };
+
 
   return (
     <div
@@ -149,19 +180,25 @@ export default function DatasetUploadModal({
                 border: "1px solid var(--border-hover)",
               }}
             >
-              <UploadCloud className="w-5 h-5" style={{ color: "var(--accent)" }} />
+              {zipResult ? (
+                <Archive className="w-5 h-5" style={{ color: "var(--accent)" }} />
+              ) : (
+                <UploadCloud className="w-5 h-5" style={{ color: "var(--accent)" }} />
+              )}
             </div>
             <div>
               <h3 className="font-bold text-base" style={{ color: "var(--text-primary)" }}>
-                Upload Dataset
+                {zipResult ? "Package Extraction Complete" : "Upload Dataset / Package"}
               </h3>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                CSV, XLSX, JSON, Parquet · Max 50 MB
+                {zipResult
+                  ? `${zipResult.package_name} · ${zipResult.total_files || (zipResult.processed?.length || 0)} files scanned`
+                  : "CSV, XLSX, JSON, Parquet, PDF, DOCX, TXT, Images, ZIP · Max 50 MB"}
               </p>
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={zipResult ? handleFinishZip : onClose}
             disabled={isProcessing}
             className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
             style={{
@@ -188,8 +225,153 @@ export default function DatasetUploadModal({
           </div>
         )}
 
-        {/* Drop zone or progress */}
-        {!isProcessing ? (
+        {/* ZIP Extraction Report Result */}
+        {zipResult ? (
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            <div
+              className="p-3.5 rounded-2xl text-xs flex items-center justify-between"
+              style={{
+                background: "rgba(16, 185, 129, 0.08)",
+                border: "1px solid rgba(16, 185, 129, 0.25)",
+                color: "#10b981",
+              }}
+            >
+              <div className="flex items-center gap-2 font-medium">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>
+                  Extracted {zipResult.processed?.length || 0} resources successfully
+                </span>
+              </div>
+              <span className="font-mono text-[10px] px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(16, 185, 129, 0.15)" }}>
+                Multi-Resource Package
+              </span>
+            </div>
+
+            {/* Processed items list */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider"
+                 style={{ color: "var(--text-muted)" }}>
+                Processed Items ({zipResult.processed?.length || 0})
+              </p>
+              {zipResult.processed && zipResult.processed.length > 0 ? (
+                zipResult.processed.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-2xl flex items-center justify-between gap-3 text-xs"
+                    style={{
+                      background: "var(--bg-tertiary)",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                        style={{
+                          background: item.type === "dataset" ? "var(--accent-light)" : item.type === "document" ? "rgba(59, 130, 246, 0.12)" : "rgba(245, 158, 11, 0.12)",
+                          border: "1px solid var(--border-hover)",
+                        }}
+                      >
+                        {item.type === "dataset" ? (
+                          <FileSpreadsheet className="w-4 h-4" style={{ color: "var(--accent)" }} />
+                        ) : item.type === "document" ? (
+                          <FileText className="w-4 h-4 text-blue-500" />
+                        ) : (
+                          <ImageIcon className="w-4 h-4 text-amber-500" />
+                        )}
+                      </div>
+                      <div className="truncate">
+                        <p className="font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                          {item.filename}
+                        </p>
+                        <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>
+                          {item.type === "dataset"
+                            ? `${item.row_count || 0} rows · ${item.column_count || 0} cols · DuckDB table created`
+                            : item.type === "document"
+                            ? `${item.chunks_indexed || 0} chunks indexed in RAG`
+                            : "Vision airframe analysis ready"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span
+                      className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full shrink-0 font-semibold"
+                      style={{
+                        background: item.type === "dataset" ? "var(--accent-light)" : item.type === "document" ? "rgba(59,130,246,0.15)" : "rgba(245,158,11,0.15)",
+                        color: item.type === "dataset" ? "var(--accent)" : item.type === "document" ? "#3b82f6" : "#f59e0b",
+                      }}
+                    >
+                      {item.type}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  No files were processed.
+                </p>
+              )}
+            </div>
+
+            {/* Failed items list */}
+            {zipResult.failed && zipResult.failed.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-red-500">
+                  Failed Files ({zipResult.failed.length})
+                </p>
+                {zipResult.failed.map((f, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2.5 rounded-xl flex items-center justify-between text-xs"
+                    style={{
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                      color: "#ef4444",
+                    }}
+                  >
+                    <span className="font-semibold truncate">{f.filename}</span>
+                    <span className="text-[10px] truncate">{f.reason}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Unsupported items list */}
+            {zipResult.unsupported && zipResult.unsupported.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider"
+                   style={{ color: "var(--text-muted)" }}>
+                  Unsupported Files ({zipResult.unsupported.length})
+                </p>
+                {zipResult.unsupported.map((u, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-xl flex items-center justify-between text-[11px]"
+                    style={{
+                      background: "var(--bg-tertiary)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    <span className="truncate">{u.filename}</span>
+                    <span className="text-[10px]">{u.reason}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Finish action */}
+            <div className="pt-2">
+              <button
+                onClick={handleFinishZip}
+                className="btn-primary w-full justify-center py-3 text-sm rounded-full flex items-center gap-2"
+              >
+                <span>Launch Analytics Dashboard</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : !isProcessing ? (
+          /* Drop zone or progress */
           <div
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -197,7 +379,7 @@ export default function DatasetUploadModal({
             onDrop={handleDrop}
             onClick={() => document.getElementById("dataset-file-input")?.click()}
             className={clsx(
-              "upload-zone flex flex-col items-center justify-center p-10 text-center transition-all cursor-pointer rounded-3xl",
+              "upload-zone flex flex-col items-center justify-center p-8 text-center transition-all cursor-pointer rounded-3xl",
               dragActive && "drag-over"
             )}
             style={{
@@ -210,7 +392,7 @@ export default function DatasetUploadModal({
             <input
               id="dataset-file-input"
               type="file"
-              accept=".csv,.xlsx,.xls,.json,.parquet"
+              accept=".csv,.xlsx,.xls,.json,.parquet,.pdf,.txt,.docx,.md,.jpg,.jpeg,.png,.webp,.zip"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files?.[0]) handleFile(e.target.files[0]);
@@ -218,13 +400,17 @@ export default function DatasetUploadModal({
             />
 
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
               style={{
                 background: "var(--accent-light)",
                 border: "1px solid var(--border-hover)",
               }}
             >
-              <FileSpreadsheet className="w-7 h-7" style={{ color: "var(--accent-soft)" }} />
+              {selectedFile?.name.toLowerCase().endsWith(".zip") ? (
+                <Archive className="w-7 h-7" style={{ color: "var(--accent-soft)" }} />
+              ) : (
+                <FileSpreadsheet className="w-7 h-7" style={{ color: "var(--accent-soft)" }} />
+              )}
             </div>
 
             {selectedFile ? (
@@ -239,10 +425,10 @@ export default function DatasetUploadModal({
             ) : (
               <>
                 <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                  Drag and drop your file here
+                  Drag & drop single dataset or ZIP package
                 </p>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  or
+                  Supports CSV, XLSX, JSON, Parquet, PDF, DOCX, TXT, Images, ZIP
                 </p>
                 <button
                   type="button"
@@ -297,14 +483,16 @@ export default function DatasetUploadModal({
         )}
 
         {/* Actions */}
-        {!isProcessing && (
+        {!isProcessing && !zipResult && (
           <div className="space-y-3">
             {selectedFile && (
               <button
                 onClick={() => processUpload(selectedFile)}
                 className="btn-primary w-full justify-center py-3 text-sm rounded-full"
               >
-                Process & Ingest Dataset
+                {selectedFile.name.toLowerCase().endsWith(".zip")
+                  ? "Extract & Process ZIP Package"
+                  : "Process & Ingest Dataset"}
               </button>
             )}
             <div className="flex items-center gap-3">
@@ -331,6 +519,7 @@ export default function DatasetUploadModal({
             </button>
           </div>
         )}
+
       </motion.div>
     </div>
   );

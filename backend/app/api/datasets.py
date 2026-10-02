@@ -13,17 +13,55 @@ router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 @router.post("/upload")
 async def upload_dataset(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Upload and process CSV/XLSX/JSON/Parquet dataset into DuckDB"""
-    dataset = await dataset_service.upload_file(db=db, file=file)
+    """Upload and process CSV/XLSX/JSON/Parquet/ZIP dataset packages into DuckDB and RAG"""
+    result = await dataset_service.upload_file(db=db, file=file)
+    return result
+
+@router.get("/overview/all")
+def get_all_datasets_overview(db: Session = Depends(get_db)):
+    """Provides a combined analytical overview across all active datasets."""
+    datasets = db.query(Dataset).order_by(Dataset.created_at.desc()).all()
+    if not datasets:
+        return {
+            "total_datasets": 0,
+            "total_rows": 0,
+            "total_columns": 0,
+            "total_size_bytes": 0,
+            "file_size_formatted": "0 B",
+            "datasets": []
+        }
+
+    dataset_summaries = []
+    total_rows = 0
+    total_cols = 0
+    total_size = 0
+
+    for d in datasets:
+        total_rows += (d.row_count or 0)
+        total_cols += (d.column_count or 0)
+        total_size += (d.file_size_bytes or 0)
+        meta = db.query(DatasetMetadata).filter(DatasetMetadata.dataset_id == d.id).first()
+        dataset_summaries.append({
+            "id": d.id,
+            "name": d.name,
+            "original_filename": d.original_filename,
+            "file_type": d.file_type,
+            "row_count": d.row_count,
+            "column_count": d.column_count,
+            "duckdb_table_name": d.duckdb_table_name,
+            "summary_stats": meta.summary_stats if meta else {},
+            "created_at": d.created_at.isoformat()
+        })
+
     return {
-        "id": dataset.id,
-        "name": dataset.name,
-        "original_filename": dataset.original_filename,
-        "file_type": dataset.file_type,
-        "row_count": dataset.row_count,
-        "column_count": dataset.column_count,
-        "created_at": dataset.created_at.isoformat()
+        "total_datasets": len(datasets),
+        "total_rows": total_rows,
+        "total_columns": total_cols,
+        "total_size_bytes": total_size,
+        "file_size_formatted": dataset_service.format_bytes(total_size),
+        "datasets": dataset_summaries
     }
+
 
 @router.post("/demo")
 def load_demo_dataset(db: Session = Depends(get_db)):

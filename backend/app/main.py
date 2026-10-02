@@ -21,8 +21,10 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         dataset_service.ensure_demo_dataset(db)
+        dataset_service.load_persisted_documents_into_rag(db)
     except Exception as e:
         print(f"Demo dataset initialization notice: {e}")
+
     finally:
         db.close()
     yield

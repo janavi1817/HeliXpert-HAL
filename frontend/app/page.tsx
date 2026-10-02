@@ -72,12 +72,21 @@ export default function Home() {
   const handleStartLanding = () => setScreen("dashboard");
 
   const handleDatasetLoaded = (dataset: Dataset) => {
-    setAllDatasets((prev) => {
-      const exists = prev.some((d) => d.id === dataset.id);
-      return exists ? prev : [dataset, ...prev];
-    });
-    setSelectedDatasetIds((prev) => Array.from(new Set([...prev, dataset.id])));
-    setCurrentDataset(dataset);
+    fetchDatasets()
+      .then((updatedList) => {
+        setAllDatasets(updatedList);
+        const target = updatedList.find((d) => d.id === dataset.id) || updatedList[0] || dataset;
+        setCurrentDataset(target);
+        setSelectedDatasetIds(updatedList.map((d) => d.id));
+      })
+      .catch(() => {
+        setAllDatasets((prev) => {
+          const exists = prev.some((d) => d.id === dataset.id);
+          return exists ? prev : [dataset, ...prev];
+        });
+        setSelectedDatasetIds((prev) => Array.from(new Set([...prev, dataset.id])));
+        setCurrentDataset(dataset);
+      });
   };
 
   const handleToggleDataset = (id: string) => {
@@ -267,10 +276,12 @@ export default function Home() {
                     />
                   </div>
                 </>
-              ) : currentDataset ? (
+              ) : currentDataset || allDatasets.length > 0 ? (
                 <DatasetDashboard
-                  datasetId={currentDataset.id}
-                  datasetName={currentDataset.name}
+                  datasetId={currentDataset?.id}
+                  datasetName={currentDataset?.name}
+                  datasets={allDatasets}
+                  onSelectDataset={(d) => setCurrentDataset(d)}
                 />
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-5">

@@ -45,12 +45,68 @@ export interface ChartConfig {
   type: "bar" | "horizontal_bar" | "donut" | "line" | "area" | "scatter";
   xAxisKey?: string;
   yAxisKey?: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
   dataKey?: string;
   nameKey?: string;
   color?: string;
   colors?: string[];
   data: any[];
 }
+
+export interface ProcessedItem {
+  filename: string;
+  type: "dataset" | "document" | "image";
+  id: string;
+  name: string;
+  row_count?: number;
+  column_count?: number;
+  table_name?: string;
+  chunks_indexed?: number;
+  file_type?: string;
+}
+
+export interface FailedItem {
+  filename: string;
+  reason: string;
+}
+
+export interface UnsupportedItem {
+  filename: string;
+  reason: string;
+}
+
+export interface UploadResponse extends Dataset {
+  is_zip?: boolean;
+  package_name?: string;
+  total_files?: number;
+  processed?: ProcessedItem[];
+  failed?: FailedItem[];
+  unsupported?: UnsupportedItem[];
+  primary_dataset?: Dataset | null;
+}
+
+export interface DatasetOverviewItem {
+  id: string;
+  name: string;
+  original_filename: string;
+  file_type: string;
+  row_count: number;
+  column_count: number;
+  duckdb_table_name: string;
+  summary_stats: any;
+  created_at: string;
+}
+
+export interface AllDatasetsOverview {
+  total_datasets: number;
+  total_rows: number;
+  total_columns: number;
+  total_size_bytes: number;
+  file_size_formatted: string;
+  datasets: DatasetOverviewItem[];
+}
+
 
 export interface RAGChunk {
   rank: number;

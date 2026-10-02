@@ -155,7 +155,7 @@ export default function DatasetCharts({ charts }: DatasetChartsProps) {
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
-                    dataKey={chart.xAxisKey || "avg_hours"}
+                    dataKey={chart.xAxisKey || "avg_value"}
                     fill={chart.color || "#a855f7"}
                     radius={[0, 6, 6, 0]}
                   />
@@ -221,22 +221,20 @@ export default function DatasetCharts({ charts }: DatasetChartsProps) {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.1)" />
                   <XAxis
                     type="number"
-                    dataKey={chart.xAxisKey || "speed"}
-                    name="Speed (km/h)"
-                    unit=" km/h"
+                    dataKey={chart.xAxisKey || "x"}
+                    name={chart.xAxisLabel || chart.xAxisKey || "X Axis"}
                     stroke="var(--text-muted)"
                     fontSize={11}
                   />
                   <YAxis
                     type="number"
-                    dataKey={chart.yAxisKey || "range"}
-                    name="Range (km)"
-                    unit=" km"
+                    dataKey={chart.yAxisKey || "y"}
+                    name={chart.yAxisLabel || chart.yAxisKey || "Y Axis"}
                     stroke="var(--text-muted)"
                     fontSize={11}
                   />
                   <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-                  <Scatter name="Helicopters" data={chart.data} fill="#8b5cf6" />
+                  <Scatter name={chart.title || "Correlation"} data={chart.data} fill={chart.color || "#8b5cf6"} />
                 </ScatterChart>
               </ResponsiveContainer>
             )}

@@ -19,8 +19,53 @@ class RAGService:
 
     def __init__(self):
         self._index_cache: Dict[str, Dict[str, Any]] = {}
+        self._doc_chunks: List[Dict[str, Any]] = []
         self.top_k = 3
         self.similarity_threshold = 0.50
+
+    def index_document_text(self, doc_id: str, doc_name: str, text: str, file_type: str = "txt") -> int:
+        """
+        Indexes an uploaded document (PDF, DOCX, TXT, MD) into RAG vector space.
+        Returns the number of indexed chunks.
+        """
+        if not text or not text.strip():
+            return 0
+
+        # Split into coherent semantic chunks (~500 chars)
+        paragraphs = [p.strip() for p in re.split(r'\n{2,}|\r\n{2,}', text) if p.strip()]
+        raw_chunks = []
+        current = ""
+        for p in paragraphs:
+            if len(current) + len(p) < 650:
+                current = (current + " " + p).strip()
+            else:
+                if current:
+                    raw_chunks.append(current)
+                current = p
+        if current:
+            raw_chunks.append(current)
+
+        if not raw_chunks:
+            # Fallback chunking by character offset
+            raw_chunks = [text[i:i+600].strip() for i in range(0, len(text), 500) if text[i:i+600].strip()]
+
+        # Remove previous chunks for this doc_id if any
+        self._doc_chunks = [c for c in self._doc_chunks if c.get("doc_id") != doc_id]
+
+        for idx, chk_text in enumerate(raw_chunks, start=1):
+            chunk_id = f"chk_doc_{re.sub(r'[^a-zA-Z0-9]', '_', doc_id)[:10]}_{idx}"
+            self._doc_chunks.append({
+                "id": chunk_id,
+                "doc_id": doc_id,
+                "source": doc_name,
+                "row_num": idx,
+                "location": f"Document Section #{idx}",
+                "text": f"[{doc_name}] {chk_text}",
+                "is_document": True,
+                "data": {"document": doc_name, "section": idx, "file_type": file_type, "excerpt": chk_text[:140]}
+            })
+
+        return len(raw_chunks)
 
     def clear_dataset_cache(self, dataset_name: str):
         """Purges cached vectors and chunks when a dataset is deleted or updated."""
@@ -30,6 +75,7 @@ class RAGService:
             self._index_cache.pop(k, None)
 
     def _get_api_key(self) -> str:
+
         key = getattr(settings, "GOOGLE_API_KEY", "") or getattr(settings, "GEMINI_API_KEY", "")
         if not key:
             key = os.getenv("GOOGLE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
@@ -134,12 +180,15 @@ class RAGService:
         Executes real semantic vector retrieval for the question over the dataset.
         Returns complete RAG transparency metadata grounded in actual execution.
         """
-        if df.empty or len(df) == 0:
-            return None
+        chunks = []
+        if df is not None and not df.empty and len(df) > 0:
+            chunks = self._build_dataset_chunks(df, dataset_name)
+        if getattr(self, "_doc_chunks", None):
+            chunks = chunks + list(self._doc_chunks)
 
-        chunks = self._build_dataset_chunks(df, dataset_name)
         if not chunks:
             return None
+
 
         query_id = str(uuid.uuid4())
         session_id = conversation_id or str(uuid.uuid4())

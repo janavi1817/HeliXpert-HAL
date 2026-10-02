@@ -83,3 +83,16 @@ class UploadedImage(Base):
     file_size_bytes = Column(Integer, default=0)
     analysis_result = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class UploadedDocument(Base):
+    __tablename__ = "uploaded_documents"
+    
+    id = Column(String(36), primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)
+    original_name = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    file_type = Column(String(20), nullable=False) # pdf, txt, docx, md
+    file_size_bytes = Column(Integer, default=0)
+    chunk_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+

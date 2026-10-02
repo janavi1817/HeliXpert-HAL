@@ -154,7 +154,35 @@ class ChartService:
                     except Exception:
                         pass
 
-        # ── CHART 6: Correlation Scatter (if at least 2 numeric columns) ─────────
+        # ── CHART 6: Geographic / Regional Distribution (if location column exists) ─────
+        loc_candidate = None
+        for c in df.columns:
+            c_low = str(c).lower()
+            if any(term in c_low for term in ["state", "location", "country", "region", "city", "base", "airport"]):
+                loc_candidate = c
+                break
+
+        if loc_candidate and loc_candidate != primary_cat and loc_candidate != secondary_cat:
+            try:
+                loc_counts = df[loc_candidate].dropna().value_counts().head(10).reset_index()
+                loc_counts.columns = ["location", "count"]
+                clean_loc = str(loc_candidate).replace("_", " ").title()
+                charts.append({
+                    "id": f"geo_{loc_candidate}",
+                    "title": f"Regional Distribution by {clean_loc}",
+                    "subtitle": f"Geographic concentration of records across {clean_loc}",
+                    "type": "horizontal_bar",
+                    "xAxisKey": "count",
+                    "yAxisKey": "location",
+                    "xAxisLabel": "Total Records",
+                    "yAxisLabel": clean_loc,
+                    "color": "#06b6d4",
+                    "data": loc_counts.to_dict(orient="records")
+                })
+            except Exception:
+                pass
+
+        # ── CHART 7: Correlation Scatter (if at least 2 numeric columns) ─────────
         if len(num_cols) >= 2:
             num1 = num_cols[0]
             num2 = num_cols[1]
@@ -184,10 +212,13 @@ class ChartService:
                     "type": "scatter",
                     "xAxisKey": "x",
                     "yAxisKey": "y",
+                    "xAxisLabel": c1_clean,
+                    "yAxisLabel": c2_clean,
                     "color": "#f59e0b",
                     "data": scatter_points
                 })
 
         return charts
+
 
 chart_service = ChartService()

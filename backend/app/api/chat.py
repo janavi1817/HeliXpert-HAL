@@ -1,8 +1,10 @@
 import uuid
 import re
 import json
+import pandas as pd
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -294,6 +296,40 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
     )
 
     if sql_response["status"] == "data_not_available":
+        # Check if RAG document store can answer this question (e.g. flight manual, operating procedures, guidelines)
+        try:
+            rag_doc_meta = rag_service.retrieve(
+                query=resolved_q,
+                dataset_name="Uploaded Documents",
+                df=pd.DataFrame(),
+                conversation_id=conv_id,
+                top_k=3,
+                used_duckdb=False
+            )
+            if rag_doc_meta and rag_doc_meta.get("retrieved_chunks"):
+                doc_context_str = "\n".join([c["content"] for c in rag_doc_meta["retrieved_chunks"]])
+                doc_answer = answer_agent.generate_response(
+                    question=question,
+                    sql=None,
+                    result_rows=None,
+                    mode="nlp",
+                    language=req.language or "en",
+                    rag_context=doc_context_str
+                )
+                _save_conversation(db, conv_id, question, doc_answer, req.mode, req.language, rag_meta=rag_doc_meta)
+                return {
+                    "mode": req.mode,
+                    "question": question,
+                    "sql": None,
+                    "result": None,
+                    "answer": doc_answer,
+                    "language": req.language or "en",
+                    "dataset_name": rag_doc_meta["retrieved_chunks"][0]["source"],
+                    "rag_metadata": rag_doc_meta
+                }
+        except Exception:
+            pass
+
         reason = sql_response.get("reason", f"The requested fields are not present in dataset '{chosen_dataset['name']}'.")
         if req.language == "hi":
             answer_text = f"डेटासेट '{chosen_dataset['name']}' में इस प्रश्न का उत्तर देने के लिए आवश्यक कॉलम उपलब्ध नहीं हैं ({reason})।"
@@ -311,6 +347,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             "language": req.language or "en",
             "dataset_name": chosen_dataset["name"]
         }
+
 
     generated_sql = sql_response["sql"]
 
