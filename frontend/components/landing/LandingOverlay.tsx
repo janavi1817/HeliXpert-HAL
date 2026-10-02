@@ -21,6 +21,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
+import HelicopterLogo from "@/components/ui/HelicopterLogo";
 
 interface LandingOverlayProps {
   onStart: () => void;
@@ -163,22 +164,7 @@ export default function LandingOverlay({ onStart }: LandingOverlayProps) {
             onClick={() => scrollToSection("home")}
             className="flex items-center gap-3 cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/25">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 3L4 8V16L12 21L20 16V8L12 3Z"
-                  stroke="white"
-                  strokeWidth="1.8"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M12 8V16M8 10L12 8L16 10"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
+            <HelicopterLogo size={38} />
             <div>
               <div className="font-extrabold text-xl leading-none text-[var(--text-primary)] tracking-tight">
                 Heli<span className="text-gradient">Xpert</span>
@@ -636,9 +622,7 @@ export default function LandingOverlay({ onStart }: LandingOverlayProps) {
       <footer className="relative z-10 w-full py-8 border-t border-[var(--border)] glass">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-muted)]">
           <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-white font-bold text-xs">
-              H
-            </div>
+            <HelicopterLogo size={24} />
             <span className="font-semibold text-[var(--text-primary)]">
               HeliXpert
             </span>

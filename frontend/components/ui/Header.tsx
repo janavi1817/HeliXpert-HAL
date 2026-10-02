@@ -6,6 +6,7 @@ import { ChatMode, Language } from "@/lib/types";
 import { useTheme } from "@/lib/theme";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
+import HelicopterLogo from "@/components/ui/HelicopterLogo";
 
 interface HeaderProps {
   currentDatasetName?: string;
@@ -75,7 +76,7 @@ export default function Header({
               }}
               title="Click to manage injected datasets"
             >
-              <Database className="w-3.5 h-3.5" />
+              <HelicopterLogo size={18} variant="icon" className="shrink-0 text-current" />
               <span className="max-w-[160px] md:max-w-[260px] truncate font-semibold">
                 {selectedCount > 1
                   ? `${selectedCount} Datasets Injected`

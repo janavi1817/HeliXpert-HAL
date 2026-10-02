@@ -95,6 +95,8 @@ export interface Message {
   content: string;
   sql_query?: string | null;
   query_result?: any[] | null;
+  dataset_name?: string | null;
+  dataset_used?: string | null;
   rag_metadata?: RAGMetadata | null;
   mode?: ChatMode;
   language?: Language;

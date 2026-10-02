@@ -183,6 +183,13 @@ def delete_dataset(dataset_id: str, db: Session = Depends(get_db)):
     except Exception:
         pass
 
+    # Purge any cached RAG indexes/vectors for this dataset
+    try:
+        from app.services.rag_service import rag_service
+        rag_service.clear_dataset_cache(dataset.name)
+    except Exception:
+        pass
+
     db.delete(dataset)
     db.commit()
     return {"status": "success", "message": f"Dataset {dataset_id} deleted."}

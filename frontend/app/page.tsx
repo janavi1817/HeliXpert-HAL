@@ -137,6 +137,8 @@ export default function Home() {
           content: res.answer,
           sql_query: res.sql,
           query_result: res.result,
+          dataset_name: res.dataset_name || res.dataset_used,
+          dataset_used: res.dataset_used || res.dataset_name,
           rag_metadata: res.rag_metadata,
           mode: res.mode,
           language: res.language as Language,

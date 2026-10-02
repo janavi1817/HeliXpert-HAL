@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import { Message } from "@/lib/types";
-import { Copy, Check, Volume2, VolumeX, Terminal, Layers, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { Copy, Check, Volume2, VolumeX, Terminal, Layers, ChevronDown, ChevronUp, Loader2, Database } from "lucide-react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
 import RAGTransparencyPanel from "./RAGTransparencyPanel";
+import HelicopterLogo from "@/components/ui/HelicopterLogo";
 
 interface MessageItemProps {
   message: Message;
@@ -245,16 +246,7 @@ export default function MessageItem({ message }: MessageItemProps) {
     >
       {/* Bot avatar */}
       {isAssistant && (
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-             style={{
-               background: "var(--accent-light)",
-               border: "1px solid var(--border-hover)",
-             }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M12 3L4 8V16L12 21L20 16V8L12 3Z"
-                  stroke="var(--accent-soft)" strokeWidth="1.8" strokeLinejoin="round" />
-          </svg>
-        </div>
+        <HelicopterLogo size={32} />
       )}
 
       {/* Bubble */}
@@ -265,36 +257,88 @@ export default function MessageItem({ message }: MessageItemProps) {
           {renderFormattedContent(message.content)}
         </div>
 
-        {/* SQL block */}
+        {/* Data Query block (Dataset Used, SQL Executed, Result Table) */}
         {message.sql_query && (
-          <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold"
-                    style={{ color: "var(--accent-soft)" }}>
-                <Terminal className="w-3 h-3" />
-                SQL EXECUTED
-              </span>
-              <button
-                onClick={handleCopySQL}
-                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors"
-                style={{
-                  background: "var(--bg-tertiary)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                {copied ? "Copied" : "Copy"}
-              </button>
+          <div className="mt-4 pt-3 space-y-2.5" style={{ borderTop: "1px solid var(--border)" }}>
+            {/* Dataset Used */}
+            {(message.dataset_name || message.dataset_used) && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="font-semibold" style={{ color: "var(--text-muted)" }}>Dataset Used:</span>
+                <span className="font-mono font-semibold px-2 py-0.5 rounded-lg text-[11px]"
+                      style={{
+                        background: "rgba(16, 185, 129, 0.12)",
+                        border: "1px solid rgba(16, 185, 129, 0.3)",
+                        color: "#10b981",
+                      }}>
+                  {message.dataset_name || message.dataset_used}
+                </span>
+              </div>
+            )}
+
+            {/* SQL Executed */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="flex items-center gap-1.5 text-xs font-semibold"
+                      style={{ color: "var(--accent-soft)" }}>
+                  <Terminal className="w-3.5 h-3.5" />
+                  SQL EXECUTED
+                </span>
+                <button
+                  onClick={handleCopySQL}
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors"
+                  style={{
+                    background: "var(--bg-tertiary)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <div className="p-3 rounded-xl font-mono text-xs overflow-x-auto"
+                   style={{
+                     background: "var(--bg-primary)",
+                     border: "1px solid var(--border)",
+                     color: "var(--accent-soft)",
+                   }}>
+                <code>{message.sql_query}</code>
+              </div>
             </div>
-            <div className="p-3 rounded-xl font-mono text-xs overflow-x-auto"
-                 style={{
-                   background: "var(--bg-primary)",
-                   border: "1px solid var(--border)",
-                   color: "var(--accent-soft)",
-                 }}>
-              <code>{message.sql_query}</code>
-            </div>
+
+            {/* Verified Query Result Preview */}
+            {message.query_result && Array.isArray(message.query_result) && message.query_result.length > 0 && (
+              <div className="pt-1 space-y-1">
+                <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>
+                  <Database className="w-3 h-3" style={{ color: "var(--accent-soft)" }} />
+                  Verified Result ({message.query_result.length} row{message.query_result.length > 1 ? "s" : ""}):
+                </span>
+                <div className="overflow-x-auto rounded-xl border max-h-48 overflow-y-auto" style={{ borderColor: "var(--border)" }}>
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead style={{ background: "var(--bg-tertiary)" }}>
+                      <tr>
+                        {Object.keys(message.query_result[0]).map((col) => (
+                          <th key={col} className="p-2 font-semibold text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {message.query_result.slice(0, 8).map((row, rIdx) => (
+                        <tr key={rIdx} className="border-t" style={{ borderColor: "var(--border)" }}>
+                          {Object.values(row).map((val: any, cIdx) => (
+                            <td key={cIdx} className="p-2 text-[11px]" style={{ color: "var(--text-primary)" }}>
+                              {val !== null && val !== undefined ? String(val) : "-"}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

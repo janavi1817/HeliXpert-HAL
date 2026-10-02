@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import clsx from "clsx";
+import HelicopterLogo from "@/components/ui/HelicopterLogo";
 
 interface SidebarProps {
   activeTab: "chat" | "dashboard" | "history";
@@ -74,12 +75,7 @@ export default function Sidebar({
              style={{ borderBottom: "1px solid var(--border)" }}>
           <div className="flex items-center gap-3 min-w-0 overflow-hidden">
             {/* Logo mark */}
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/25 shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M12 3L4 8V16L12 21L20 16V8L12 3Z" stroke="white" strokeWidth="1.8" strokeLinejoin="round" />
-                <path d="M12 8V16M8 10L12 8L16 10" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
+            <HelicopterLogo size={36} />
 
             <AnimatePresence>
               {!isCollapsed && (

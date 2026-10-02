@@ -95,6 +95,8 @@ export async function sendChatMessage(payload: {
   result?: any[];
   language: string;
   conversation_id: string;
+  dataset_name?: string;
+  dataset_used?: string;
   rag_metadata?: RAGMetadata | null;
 }> {
   const res = await fetch(`${API_BASE}/chat`, {

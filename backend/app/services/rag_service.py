@@ -22,6 +22,13 @@ class RAGService:
         self.top_k = 3
         self.similarity_threshold = 0.50
 
+    def clear_dataset_cache(self, dataset_name: str):
+        """Purges cached vectors and chunks when a dataset is deleted or updated."""
+        clean_key = re.sub(r'[^a-zA-Z0-9]', '_', dataset_name).lower()
+        keys_to_del = [k for k in self._index_cache if clean_key in k.lower()]
+        for k in keys_to_del:
+            self._index_cache.pop(k, None)
+
     def _get_api_key(self) -> str:
         key = getattr(settings, "GOOGLE_API_KEY", "") or getattr(settings, "GEMINI_API_KEY", "")
         if not key:

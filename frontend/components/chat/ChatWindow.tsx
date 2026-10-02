@@ -5,6 +5,7 @@ import { Message, Language } from "@/lib/types";
 import MessageItem from "./MessageItem";
 import { Database, Image as ImageIcon, Sparkles, Cpu, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
+import HelicopterLogo from "@/components/ui/HelicopterLogo";
 
 interface ChatWindowProps {
   messages: Message[];
@@ -256,16 +257,7 @@ export default function ChatWindow({
               className="flex items-start gap-3 max-w-md"
             >
               {/* Avatar */}
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                   style={{
-                     background: "var(--accent-light)",
-                     border: "1px solid var(--border-hover)",
-                   }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 3L4 8V16L12 21L20 16V8L12 3Z" stroke="var(--accent-soft)"
-                        strokeWidth="1.8" strokeLinejoin="round" />
-                </svg>
-              </div>
+              <HelicopterLogo size={32} />
 
               <div className="msg-assistant">
                 <div className="flex items-center gap-2">
