@@ -11,7 +11,7 @@ import DatasetDashboard from "@/components/dashboard/DatasetDashboard";
 import DatasetUploadModal from "@/components/upload/DatasetUploadModal";
 import ImageUploadModal from "@/components/upload/ImageUploadModal";
 import HistoryDrawer from "@/components/sidebar/HistoryDrawer";
-import { fetchDatasets, sendChatMessage } from "@/lib/api";
+import { fetchDatasets, sendChatMessage, fetchSuggestedPrompts } from "@/lib/api";
 import { Dataset, Message, ChatMode, Language } from "@/lib/types";
 
 export default function Home() {
