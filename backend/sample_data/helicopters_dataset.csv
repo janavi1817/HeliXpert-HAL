@@ -1,0 +1,121 @@
+helicopter_id,model,manufacturer,year,engine_type,engine_hours,flight_hours,fuel_capacity,max_speed,range_km,country,status
+HEL-HAL-0001,HAL Cheetah,HAL,1991,Turbomeca Artouste IIIB,5787,5364,587,201,439,India,Active
+HEL-HAL-0002,HAL Chetak,HAL,1998,Turbomeca Artouste IIIB,4645,4300,593,205,470,India,Active
+HEL-HAL-0003,HAL Cheetah,HAL,2008,Turbomeca Artouste IIIB,6446,5816,557,212,405,India,Active
+HEL-HAL-0004,HAL Cheetah,HAL,2001,Turbomeca Artouste IIIB,6844,5828,561,201,410,India,Inspection Required
+HEL-HAL-0005,HAL Dhruv ALH Mk III,HAL,2017,Turboshaft (Shakti 1H1),3573,3094,1426,292,649,India,Active
+HEL-HAL-0006,HAL Light Utility Helicopter (LUH),HAL,2019,Single Turboshaft (HE-Ardiden 1U),2122,1878,603,254,497,India,Active
+HEL-HAL-0007,HAL Dhruv ALH Mk III,HAL,2022,Turboshaft (Shakti 1H1),710,670,1394,298,621,India,Active
+HEL-HAL-0008,HAL Rudra (ALH-WSI),HAL,2021,Twin Turboshaft (Shakti 1H1),1459,1329,1343,290,602,India,Active
+HEL-HAL-0009,HAL Chetak,HAL,2005,Turbomeca Artouste IIIB,4283,3999,579,209,475,India,Active
+HEL-HAL-0010,HAL Cheetah,HAL,1998,Turbomeca Artouste IIIB,11093,10274,542,212,425,India,Inspection Required
+HEL-HAL-0011,HAL Rudra (ALH-WSI),HAL,2015,Twin Turboshaft (Shakti 1H1),2518,2164,1350,283,616,India,Inspection Required
+HEL-HAL-0012,HAL Cheetah,HAL,2002,Turbomeca Artouste IIIB,4999,4359,574,204,442,India,Inspection Required
+HEL-HAL-0013,HAL Chetak,HAL,1997,Turbomeca Artouste IIIB,7514,7036,586,206,438,India,Active
+HEL-HAL-0014,HAL Prachand LCH,HAL,2023,Twin Turboshaft (Shakti),515,457,1154,281,573,India,Active
+HEL-HAL-0015,HAL Chetak,HAL,1993,Turbomeca Artouste IIIB,13960,13277,601,206,469,India,Maintenance
+HEL-HAL-0016,HAL Cheetah,HAL,1998,Turbomeca Artouste IIIB,5447,4912,586,211,421,India,Active
+HEL-HAL-0017,HAL Chetak,HAL,2014,Turbomeca Artouste IIIB,2355,2032,587,214,447,India,Active
+HEL-HAL-0018,HAL Rudra (ALH-WSI),HAL,2016,Twin Turboshaft (Shakti 1H1),3065,2740,1330,289,605,India,Decommissioned
+HEL-HAL-0019,HAL Dhruv ALH Mk III,HAL,2013,Turboshaft (Shakti 1H1),5673,4899,1399,288,618,India,Active
+HEL-HAL-0020,HAL Chetak,HAL,2015,Turbomeca Artouste IIIB,2067,1788,603,213,443,India,Active
+HEL-HAL-0021,HAL Cheetah,HAL,2003,Turbomeca Artouste IIIB,10010,8949,578,206,418,India,Active
+HEL-HAL-0022,HAL Cheetah,HAL,1997,Turbomeca Artouste IIIB,8003,7286,573,207,412,India,Active
+HEL-HAL-0023,HAL Prachand LCH,HAL,2018,Twin Turboshaft (Shakti),1890,1751,1144,275,539,India,Active
+HEL-HAL-0024,HAL Prachand LCH,HAL,2018,Twin Turboshaft (Shakti),3016,2848,1145,279,566,India,Active
+HEL-HAL-0025,HAL Chetak,HAL,1989,Turbomeca Artouste IIIB,14083,12520,570,217,465,India,Inspection Required
+HEL-HAL-0026,HAL Prachand LCH,HAL,2018,Twin Turboshaft (Shakti),1415,1281,1159,288,538,India,Active
+HEL-HAL-0027,HAL Dhruv ALH Mk III,HAL,2018,Turboshaft (Shakti 1H1),2669,2508,1392,288,649,India,Decommissioned
+HEL-HAL-0028,HAL Prachand LCH,HAL,2021,Twin Turboshaft (Shakti),987,849,1134,282,570,India,Active
+HEL-HAL-0029,HAL Dhruv ALH Mk III,HAL,2022,Turboshaft (Shakti 1H1),1580,1344,1428,298,630,India,Active
+HEL-HAL-0030,HAL Light Utility Helicopter (LUH),HAL,2022,Single Turboshaft (HE-Ardiden 1U),1082,927,590,251,485,India,Active
+HEL-HAL-0031,HAL Rudra (ALH-WSI),HAL,2021,Twin Turboshaft (Shakti 1H1),1122,980,1380,288,616,India,Active
+HEL-HAL-0032,HAL Prachand LCH,HAL,2020,Twin Turboshaft (Shakti),1213,1059,1133,286,555,India,Active
+HEL-HAL-0033,HAL Dhruv ALH Mk III,HAL,2021,Turboshaft (Shakti 1H1),1350,1207,1383,293,620,India,Active
+HEL-HAL-0034,HAL Dhruv ALH Mk III,HAL,2021,Turboshaft (Shakti 1H1),837,760,1416,288,652,India,Active
+HEL-HAL-0035,HAL Chetak,HAL,1987,Turbomeca Artouste IIIB,11250,10063,571,208,455,India,Active
+HEL-HAL-0036,HAL Rudra (ALH-WSI),HAL,2020,Twin Turboshaft (Shakti 1H1),1102,994,1378,281,585,India,Decommissioned
+HEL-HAL-0037,HAL Chetak,HAL,2003,Turbomeca Artouste IIIB,9950,9233,571,207,457,India,Active
+HEL-HAL-0038,HAL Prachand LCH,HAL,2020,Twin Turboshaft (Shakti),1326,1184,1149,284,568,India,Active
+HEL-HAL-0039,HAL Cheetah,HAL,2014,Turbomeca Artouste IIIB,3606,3391,548,204,412,India,Active
+HEL-HAL-0040,HAL Cheetah,HAL,2005,Turbomeca Artouste IIIB,4173,3874,561,203,445,India,Maintenance
+HEL-HAL-0041,HAL Chetak,HAL,2000,Turbomeca Artouste IIIB,5849,5536,595,211,452,India,Active
+HEL-HAL-0042,HAL Dhruv ALH Mk III,HAL,2017,Turboshaft (Shakti 1H1),3178,2932,1427,292,650,India,Inspection Required
+HEL-HAL-0043,HAL Chetak,HAL,1985,Turbomeca Artouste IIIB,8324,7303,564,213,437,India,Standby
+HEL-HAL-0044,HAL Chetak,HAL,2002,Turbomeca Artouste IIIB,4786,4391,605,218,437,India,Standby
+HEL-HAL-0045,HAL Prachand LCH,HAL,2023,Twin Turboshaft (Shakti),521,453,1156,284,544,India,Active
+HEL-HAL-0046,HAL Prachand LCH,HAL,2024,Twin Turboshaft (Shakti),482,458,1177,280,561,India,Active
+HEL-HAL-0047,HAL Rudra (ALH-WSI),HAL,2016,Twin Turboshaft (Shakti 1H1),3819,3283,1360,283,597,India,Decommissioned
+HEL-AIR-0048,Airbus H145,Airbus Helicopters,2019,Twin Turbomeca Arriel 2E,2992,2762,897,272,651,Germany,Maintenance
+HEL-BOE-0049,Boeing CH-47F Chinook,Boeing,2016,Twin Turboshaft (Honeywell T55-GA-714A),3112,2702,3952,304,722,USA,Active
+HEL-AIR-0050,Airbus H125 Écureuil,Airbus Helicopters,2013,Turbomeca Arriel 2D,4758,4507,565,290,688,France,Standby
+HEL-AIR-0051,Airbus H225M Caracal,Airbus Helicopters,2020,Twin Turboshaft (Makila 2A1),2969,2506,2554,324,839,France,Inspection Required
+HEL-BOE-0052,Boeing AH-64E Apache,Boeing,2023,Twin Turboshaft (GE T700-701D),1188,1026,1415,296,483,USA,Active
+HEL-KAM-0053,Kamov Ka-226T,Kamov,2020,Twin Turbomeca Arrius 2G1,2119,1983,778,258,599,Russia,Inspection Required
+HEL-AIR-0054,Airbus H145,Airbus Helicopters,2021,Twin Turbomeca Arriel 2E,1819,1687,921,265,669,Germany,Maintenance
+HEL-AIR-0055,Airbus H225M Caracal,Airbus Helicopters,2019,Twin Turboshaft (Makila 2A1),2953,2731,2571,330,865,France,Decommissioned
+HEL-KAM-0056,Kamov Ka-226T,Kamov,2018,Twin Turbomeca Arrius 2G1,2989,2504,761,244,598,Russia,Standby
+HEL-BOE-0057,Boeing CH-47F Chinook,Boeing,2015,Twin Turboshaft (Honeywell T55-GA-714A),4314,3995,3887,295,736,USA,Decommissioned
+HEL-MIL-0058,Mil Mi-17V-5,Mil,2011,Klimov VK-2500,5304,4668,2636,257,585,Russia,Active
+HEL-SIK-0059,Sikorsky UH-60M Black Hawk,Sikorsky,2020,Twin Turboshaft (GE T700-GE-701D),2486,2109,1343,299,584,USA,Active
+HEL-BEL-0060,Bell 412EP,Bell,2019,Pratt & Whitney PT6T-3D,1437,1221,1278,255,683,USA,Standby
+HEL-BEL-0061,Bell 407GXi,Bell,2024,Rolls-Royce 250-C47E/4,476,427,474,253,632,USA,Active
+HEL-SIK-0062,Sikorsky MH-60R Seahawk,Sikorsky,2020,Twin Turboshaft (GE T700-401C),2513,2197,1605,276,814,USA,Maintenance
+HEL-SIK-0063,Sikorsky MH-60R Seahawk,Sikorsky,2020,Twin Turboshaft (GE T700-401C),1641,1546,1589,269,834,USA,Active
+HEL-SIK-0064,Sikorsky MH-60R Seahawk,Sikorsky,2017,Twin Turboshaft (GE T700-401C),2861,2555,1577,268,836,USA,Inspection Required
+HEL-MIL-0065,Mil Mi-17V-5,Mil,2021,Klimov VK-2500,969,853,2648,242,582,Russia,Maintenance
+HEL-AIR-0066,Airbus H225M Caracal,Airbus Helicopters,2017,Twin Turboshaft (Makila 2A1),3405,2911,2558,331,851,France,Maintenance
+HEL-AIR-0067,Airbus H225M Caracal,Airbus Helicopters,2018,Twin Turboshaft (Makila 2A1),1587,1378,2581,321,866,France,Active
+HEL-MIL-0068,Mil Mi-17V-5,Mil,2018,Klimov VK-2500,1564,1379,2590,244,601,Russia,Inspection Required
+HEL-SIK-0069,Sikorsky UH-60M Black Hawk,Sikorsky,2017,Twin Turboshaft (GE T700-GE-701D),2144,1951,1388,296,591,USA,Inspection Required
+HEL-AIR-0070,Airbus H125 Écureuil,Airbus Helicopters,2021,Turbomeca Arriel 2D,1127,1071,579,280,664,France,Active
+HEL-KAM-0071,Kamov Ka-226T,Kamov,2016,Twin Turbomeca Arrius 2G1,4600,3955,771,248,581,Russia,Active
+HEL-SIK-0072,Sikorsky MH-60R Seahawk,Sikorsky,2018,Twin Turboshaft (GE T700-401C),2803,2352,1629,270,859,USA,Standby
+HEL-SIK-0073,Sikorsky UH-60M Black Hawk,Sikorsky,2019,Twin Turboshaft (GE T700-GE-701D),2497,2340,1350,295,576,USA,Active
+HEL-AIR-0074,Airbus H125 Écureuil,Airbus Helicopters,2020,Turbomeca Arriel 2D,1725,1626,541,282,686,France,Maintenance
+HEL-KAM-0075,Kamov Ka-226T,Kamov,2016,Twin Turbomeca Arrius 2G1,4213,3989,808,255,622,Russia,Standby
+HEL-BOE-0076,Boeing CH-47F Chinook,Boeing,2020,Twin Turboshaft (Honeywell T55-GA-714A),2178,1957,3946,297,748,USA,Standby
+HEL-KAM-0077,Kamov Ka-226T,Kamov,2022,Twin Turbomeca Arrius 2G1,1487,1282,774,259,629,Russia,Decommissioned
+HEL-BEL-0078,Bell 407GXi,Bell,2022,Rolls-Royce 250-C47E/4,1549,1411,485,240,621,USA,Decommissioned
+HEL-SIK-0079,Sikorsky MH-60R Seahawk,Sikorsky,2023,Twin Turboshaft (GE T700-401C),892,811,1633,272,821,USA,Active
+HEL-SIK-0080,Sikorsky MH-60R Seahawk,Sikorsky,2021,Twin Turboshaft (GE T700-401C),2121,1795,1605,279,810,USA,Active
+HEL-BOE-0081,Boeing CH-47F Chinook,Boeing,2015,Twin Turboshaft (Honeywell T55-GA-714A),4856,4173,3944,309,749,USA,Active
+HEL-BOE-0082,Boeing CH-47F Chinook,Boeing,2016,Twin Turboshaft (Honeywell T55-GA-714A),2572,2347,3931,309,756,USA,Standby
+HEL-AIR-0083,Airbus H225M Caracal,Airbus Helicopters,2022,Twin Turboshaft (Makila 2A1),1255,1123,2569,324,851,France,Active
+HEL-SIK-0084,Sikorsky MH-60R Seahawk,Sikorsky,2021,Twin Turboshaft (GE T700-401C),1101,946,1593,268,823,USA,Decommissioned
+HEL-AIR-0085,Airbus H125 Écureuil,Airbus Helicopters,2017,Turbomeca Arriel 2D,4435,4053,556,284,661,France,Active
+HEL-BEL-0086,Bell 412EP,Bell,2009,Pratt & Whitney PT6T-3D,4986,4401,1236,266,660,USA,Active
+HEL-MIL-0087,Mil Mi-17V-5,Mil,2014,Klimov VK-2500,3983,3696,2593,250,590,Russia,Active
+HEL-BOE-0088,Boeing CH-47F Chinook,Boeing,2018,Twin Turboshaft (Honeywell T55-GA-714A),2812,2439,3903,298,757,USA,Maintenance
+HEL-BOE-0089,Boeing CH-47F Chinook,Boeing,2015,Twin Turboshaft (Honeywell T55-GA-714A),2595,2275,3912,310,745,USA,Decommissioned
+HEL-BEL-0090,Bell 407GXi,Bell,2020,Rolls-Royce 250-C47E/4,2624,2395,461,241,652,USA,Active
+HEL-KAM-0091,Kamov Ka-226T,Kamov,2018,Twin Turbomeca Arrius 2G1,2041,1880,810,244,590,Russia,Active
+HEL-AIR-0092,Airbus H225M Caracal,Airbus Helicopters,2018,Twin Turboshaft (Makila 2A1),3028,2871,2566,325,881,France,Decommissioned
+HEL-BOE-0093,Boeing CH-47F Chinook,Boeing,2022,Twin Turboshaft (Honeywell T55-GA-714A),946,810,3909,307,728,USA,Active
+HEL-KAM-0094,Kamov Ka-226T,Kamov,2017,Twin Turbomeca Arrius 2G1,4102,3868,761,251,618,Russia,Maintenance
+HEL-BEL-0095,Bell 407GXi,Bell,2017,Rolls-Royce 250-C47E/4,2986,2690,488,254,638,USA,Decommissioned
+HEL-BEL-0096,Bell 407GXi,Bell,2017,Rolls-Royce 250-C47E/4,3572,3079,486,238,609,USA,Active
+HEL-KAM-0097,Kamov Ka-226T,Kamov,2015,Twin Turbomeca Arrius 2G1,5544,5085,745,247,610,Russia,Decommissioned
+HEL-AIR-0098,Airbus H125 Écureuil,Airbus Helicopters,2013,Turbomeca Arriel 2D,7092,6051,521,294,664,France,Inspection Required
+HEL-AIR-0099,Airbus H145,Airbus Helicopters,2020,Twin Turbomeca Arriel 2E,2283,2077,936,269,672,Germany,Inspection Required
+HEL-BEL-0100,Bell 412EP,Bell,2006,Pratt & Whitney PT6T-3D,6850,6236,1271,267,654,USA,Decommissioned
+HEL-AIR-0101,Airbus H225M Caracal,Airbus Helicopters,2011,Twin Turboshaft (Makila 2A1),3974,3416,2586,317,850,France,Maintenance
+HEL-BEL-0102,Bell 412EP,Bell,2009,Pratt & Whitney PT6T-3D,8883,7693,1235,251,694,USA,Active
+HEL-SIK-0103,Sikorsky UH-60M Black Hawk,Sikorsky,2014,Twin Turboshaft (GE T700-GE-701D),4249,3994,1344,300,577,USA,Active
+HEL-BEL-0104,Bell 407GXi,Bell,2020,Rolls-Royce 250-C47E/4,2069,1761,514,245,633,USA,Active
+HEL-AIR-0105,Airbus H225M Caracal,Airbus Helicopters,2014,Twin Turboshaft (Makila 2A1),6258,5295,2538,324,886,France,Inspection Required
+HEL-AIR-0106,Airbus H145,Airbus Helicopters,2023,Twin Turbomeca Arriel 2E,638,551,935,264,658,Germany,Active
+HEL-AIR-0107,Airbus H145,Airbus Helicopters,2020,Twin Turbomeca Arriel 2E,2076,1857,914,266,674,Germany,Active
+HEL-MIL-0108,Mil Mi-17V-5,Mil,2016,Klimov VK-2500,2525,2390,2647,254,584,Russia,Active
+HEL-BEL-0109,Bell 407GXi,Bell,2016,Rolls-Royce 250-C47E/4,2309,2100,466,252,610,USA,Decommissioned
+HEL-BOE-0110,Boeing AH-64E Apache,Boeing,2017,Twin Turboshaft (GE T700-701D),2763,2575,1450,293,477,USA,Inspection Required
+HEL-KAM-0111,Kamov Ka-226T,Kamov,2016,Twin Turbomeca Arrius 2G1,4925,4178,788,252,620,Russia,Decommissioned
+HEL-BEL-0112,Bell 412EP,Bell,2006,Pratt & Whitney PT6T-3D,8318,7217,1256,258,701,USA,Active
+HEL-AIR-0113,Airbus H225M Caracal,Airbus Helicopters,2012,Twin Turboshaft (Makila 2A1),5956,5593,2551,325,838,France,Active
+HEL-AIR-0114,Airbus H145,Airbus Helicopters,2015,Twin Turbomeca Arriel 2E,2996,2796,940,273,666,Germany,Active
+HEL-SIK-0115,Sikorsky UH-60M Black Hawk,Sikorsky,2012,Twin Turboshaft (GE T700-GE-701D),3171,2775,1360,301,607,USA,Active
+HEL-SIK-0116,Sikorsky MH-60R Seahawk,Sikorsky,2023,Twin Turboshaft (GE T700-401C),959,834,1629,271,853,USA,Active
+HEL-BOE-0117,Boeing CH-47F Chinook,Boeing,2019,Twin Turboshaft (Honeywell T55-GA-714A),3298,3013,3938,302,750,USA,Maintenance
+HEL-SIK-0118,Sikorsky MH-60R Seahawk,Sikorsky,2022,Twin Turboshaft (GE T700-401C),1537,1389,1615,280,828,USA,Maintenance
+HEL-BOE-0119,Boeing AH-64E Apache,Boeing,2021,Twin Turboshaft (GE T700-701D),1322,1147,1396,300,474,USA,Active
+HEL-MIL-0120,Mil Mi-17V-5,Mil,2015,Klimov VK-2500,2761,2539,2604,245,600,Russia,Active
