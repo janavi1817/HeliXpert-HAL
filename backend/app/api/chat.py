@@ -211,6 +211,29 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         db.add(conversation)
         db.flush()
 
+    # 6. RAG Semantic Retrieval & Transparency Metadata Generation
+    rag_metadata = None
+    try:
+        from app.services.rag_service import rag_service
+        from app.services.dataset_service import dataset_service
+        import pandas as pd
+        if dataset.file_path and Path(dataset.file_path).exists():
+            df_for_rag = dataset_service.load_df_from_file(Path(dataset.file_path), dataset.file_type)
+        else:
+            _, sample_records = duckdb_manager.execute_read_only(f'SELECT * FROM "{table_name}" LIMIT 80')
+            df_for_rag = pd.DataFrame(sample_records)
+
+        rag_metadata = rag_service.retrieve(
+            query=question,
+            dataset_name=dataset.name,
+            df=df_for_rag,
+            conversation_id=conv_id,
+            top_k=3,
+            used_duckdb=True
+        )
+    except Exception:
+        rag_metadata = None
+
     user_msg = Message(
         id=str(uuid.uuid4()),
         conversation_id=conv_id,
@@ -226,8 +249,9 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         conversation_id=conv_id,
         role="assistant",
         content=answer_text,
-        sql_query=generated_sql,
+        sql_query=generated_sql if (req.mode == "rag" or "sql" in question.lower()) else None,
         query_result=result_rows if req.mode == "rag" else None,
+        rag_metadata=rag_metadata,
         mode=req.mode or "nlp",
         language=req.language or "en"
     )
@@ -240,11 +264,12 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         "answer": answer_text,
         "language": req.language or "en",
         "conversation_id": conv_id,
-        "dataset_name": dataset.name
+        "dataset_name": dataset.name,
+        "rag_metadata": rag_metadata
     }
 
     # In Data Query mode, show the EXACT SQL that was actually executed
-    if req.mode == "rag":
+    if req.mode == "rag" or "sql" in question.lower():
         response_payload["sql"] = generated_sql
         response_payload["result"] = result_rows[:15] if result_rows else []
 

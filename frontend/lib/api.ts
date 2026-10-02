@@ -1,4 +1,4 @@
-import { Dataset, DatasetSummary, ColumnStat, ChartConfig, Message, ImageAnalysisResponse } from "./types";
+import { Dataset, DatasetSummary, ColumnStat, ChartConfig, Message, ImageAnalysisResponse, RAGMetadata } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
@@ -94,6 +94,7 @@ export async function sendChatMessage(payload: {
   result?: any[];
   language: string;
   conversation_id: string;
+  rag_metadata?: RAGMetadata | null;
 }> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",

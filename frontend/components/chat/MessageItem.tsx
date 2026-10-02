@@ -2,18 +2,20 @@
 
 import React, { useState } from "react";
 import { Message } from "@/lib/types";
-import { Copy, Check, Volume2, VolumeX, Terminal } from "lucide-react";
+import { Copy, Check, Volume2, VolumeX, Terminal, Layers, ChevronDown, ChevronUp } from "lucide-react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
+import RAGTransparencyPanel from "./RAGTransparencyPanel";
 
 interface MessageItemProps {
   message: Message;
 }
 
 export default function MessageItem({ message }: MessageItemProps) {
-  const isAssistant    = message.role === "assistant";
-  const [copied, setCopied]           = useState(false);
+  const isAssistant = message.role === "assistant";
+  const [copied, setCopied] = useState(false);
   const [isPlayingAudio, setIsPlaying] = useState(false);
+  const [isRagPanelOpen, setIsRagPanelOpen] = useState(false);
 
   const handleCopySQL = () => {
     if (message.sql_query) {
@@ -199,26 +201,55 @@ export default function MessageItem({ message }: MessageItemProps) {
 
         {/* Actions for assistant */}
         {isAssistant && (
-          <div className="mt-3 flex items-center justify-between pt-2"
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2"
                style={{ borderTop: "1px solid var(--border)" }}>
-            <button
-              onClick={handleSpeak}
-              className={clsx(
-                "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-all",
-                isPlayingAudio && "animate-pulse"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSpeak}
+                className={clsx(
+                  "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-all",
+                  isPlayingAudio && "animate-pulse"
+                )}
+                style={{
+                  background: isPlayingAudio ? "var(--accent-light)" : "var(--bg-tertiary)",
+                  border: "1px solid var(--border)",
+                  color: isPlayingAudio ? "var(--accent-soft)" : "var(--text-muted)",
+                }}
+                title={isPlayingAudio ? "Stop Audio" : "Listen"}
+              >
+                {isPlayingAudio
+                  ? <VolumeX className="w-3 h-3" />
+                  : <Volume2 className="w-3 h-3" />}
+                <span>{isPlayingAudio ? "Playing" : "Speak"}</span>
+              </button>
+
+              {/* RAG Transparency Icon Button (Only shown if RAG was actually used) */}
+              {message.rag_metadata && message.rag_metadata.used_rag && (
+                <button
+                  onClick={() => setIsRagPanelOpen(!isRagPanelOpen)}
+                  className={clsx(
+                    "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-all border",
+                    isRagPanelOpen ? "font-semibold shadow-sm" : "hover:border-[var(--border-hover)]"
+                  )}
+                  style={{
+                    background: isRagPanelOpen ? "var(--accent-light)" : "var(--bg-tertiary)",
+                    borderColor: isRagPanelOpen ? "var(--accent-soft)" : "var(--border)",
+                    color: isRagPanelOpen ? "var(--accent-soft)" : "var(--text-secondary)",
+                  }}
+                  title="Inspect RAG Retrieval & Transparency Details"
+                >
+                  <Layers className="w-3.5 h-3.5 text-[var(--accent-soft)]" />
+                  <span>RAG Transparency</span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold"
+                    style={{ background: "var(--surface)", color: "var(--accent-soft)" }}
+                  >
+                    {message.rag_metadata.retrieved_chunks?.length ?? 0}
+                  </span>
+                  {isRagPanelOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
               )}
-              style={{
-                background: isPlayingAudio ? "var(--accent-light)" : "var(--bg-tertiary)",
-                border: "1px solid var(--border)",
-                color: isPlayingAudio ? "var(--accent-soft)" : "var(--text-muted)",
-              }}
-              title={isPlayingAudio ? "Stop Audio" : "Listen"}
-            >
-              {isPlayingAudio
-                ? <VolumeX className="w-3 h-3" />
-                : <Volume2 className="w-3 h-3" />}
-              <span>{isPlayingAudio ? "Playing" : "Speak"}</span>
-            </button>
+            </div>
 
             <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>
               {message.created_at
@@ -226,6 +257,11 @@ export default function MessageItem({ message }: MessageItemProps) {
                 : "Just now"}
             </span>
           </div>
+        )}
+
+        {/* Expandable RAG Transparency Panel */}
+        {isAssistant && message.rag_metadata && message.rag_metadata.used_rag && (
+          <RAGTransparencyPanel metadata={message.rag_metadata} isOpen={isRagPanelOpen} />
         )}
       </div>
 

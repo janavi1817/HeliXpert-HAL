@@ -74,6 +74,7 @@ def get_conversation_messages(conv_id: str, db: Session = Depends(get_db)):
             "query_result": m.query_result,
             "mode": m.mode,
             "language": m.language,
+            "rag_metadata": getattr(m, "rag_metadata", None),
             "created_at": m.created_at.isoformat()
         }
         for m in conv.messages

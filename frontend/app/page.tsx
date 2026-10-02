@@ -74,6 +74,7 @@ export default function Home() {
           content: res.answer,
           sql_query: res.sql,
           query_result: res.result,
+          rag_metadata: res.rag_metadata,
           mode: res.mode,
           language: res.language as Language,
           created_at: new Date().toISOString(),

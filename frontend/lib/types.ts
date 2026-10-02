@@ -52,12 +52,50 @@ export interface ChartConfig {
   data: any[];
 }
 
+export interface RAGChunk {
+  rank: number;
+  chunk_id: string;
+  similarity_score: number;
+  source: string;
+  location: string;
+  content: string;
+  raw_data?: Record<string, any>;
+}
+
+export interface RAGFlowStep {
+  step: number;
+  name: string;
+  desc: string;
+}
+
+export interface RAGMetadata {
+  used_rag: boolean;
+  used_duckdb?: boolean;
+  session_id: string;
+  query_id: string;
+  timestamp: string;
+  configuration: {
+    embedding_model: string;
+    vector_db: string;
+    top_k: number;
+    similarity_threshold: number;
+  };
+  summary: {
+    chunks_retrieved: number;
+    total_chunks_indexed: number;
+    query: string;
+  };
+  flow: RAGFlowStep[];
+  retrieved_chunks: RAGChunk[];
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   sql_query?: string | null;
   query_result?: any[] | null;
+  rag_metadata?: RAGMetadata | null;
   mode?: ChatMode;
   language?: Language;
   created_at?: string;

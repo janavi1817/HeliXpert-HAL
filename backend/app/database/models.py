@@ -67,6 +67,7 @@ class Message(Base):
     query_result = Column(JSON, nullable=True)
     mode = Column(String(20), default="nlp") # nlp, rag/query
     language = Column(String(10), default="en") # en, hi, kn
+    rag_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     conversation = relationship("Conversation", back_populates="messages")

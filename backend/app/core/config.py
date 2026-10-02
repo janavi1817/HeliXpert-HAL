@@ -20,8 +20,13 @@ class Settings:
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api"
     
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR}/helixpert.db")
+    # Database (resolve relative sqlite paths to absolute DATA_DIR)
+    _raw_db_url: str = os.getenv("DATABASE_URL", "")
+    DATABASE_URL: str = (
+        f"sqlite:///{DATA_DIR.as_posix()}/helixpert.db"
+        if (not _raw_db_url or "sqlite:///./data" in _raw_db_url or _raw_db_url.startswith("sqlite:///data"))
+        else _raw_db_url
+    )
     
     # OpenAI
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
