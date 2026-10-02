@@ -10,6 +10,19 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 IMAGE_DIR = DATA_DIR / "images"
 SAMPLE_DIR = BASE_DIR / "sample_data"
 
+# SQLite and DuckDB database directory:
+# When project is located inside a cloud sync folder (e.g. OneDrive), cloud sync engines
+# lock database files during writes, causing ERROR_SHARING_VIOLATION and sync errors (Red X).
+# Active databases are routed to a dedicated local directory (~/.helixpert/data) by default.
+_custom_db_dir = os.getenv("HELIXPERT_DB_DIR")
+if _custom_db_dir:
+    DB_DIR = Path(_custom_db_dir)
+elif "OneDrive" in str(DATA_DIR):
+    DB_DIR = Path.home() / ".helixpert" / "data"
+else:
+    DB_DIR = DATA_DIR
+
+DB_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -20,10 +33,10 @@ class Settings:
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api"
     
-    # Database (resolve relative sqlite paths to absolute DATA_DIR)
+    # Database (resolve relative sqlite paths to absolute DB_DIR)
     _raw_db_url: str = os.getenv("DATABASE_URL", "")
     DATABASE_URL: str = (
-        f"sqlite:///{DATA_DIR.as_posix()}/helixpert.db"
+        f"sqlite:///{DB_DIR.as_posix()}/helixpert.db"
         if (not _raw_db_url or "sqlite:///./data" in _raw_db_url or _raw_db_url.startswith("sqlite:///data"))
         else _raw_db_url
     )

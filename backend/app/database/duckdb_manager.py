@@ -2,9 +2,9 @@ import duckdb
 import threading
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
-from app.core.config import settings, DATA_DIR
+from app.core.config import settings, DATA_DIR, DB_DIR
 
-DUCKDB_PATH = DATA_DIR / "analytics.duckdb"
+DUCKDB_PATH = DB_DIR / "analytics.duckdb"
 
 class DuckDBManager:
     _instance = None
