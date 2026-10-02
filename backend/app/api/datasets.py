@@ -186,3 +186,52 @@ def delete_dataset(dataset_id: str, db: Session = Depends(get_db)):
     db.delete(dataset)
     db.commit()
     return {"status": "success", "message": f"Dataset {dataset_id} deleted."}
+
+@router.get("/{dataset_id}/suggested-prompts")
+def get_suggested_prompts(
+    dataset_id: str,
+    language: Optional[str] = Query("en"),
+    db: Session = Depends(get_db)
+):
+    """
+    Dynamically generates 4-6 executable question suggestions grounded entirely in the active dataset schema.
+    Supports English ('en'), Hindi ('hi'), and Kannada ('kn').
+    Never uses hardcoded dataset-specific questions.
+    """
+    lang = (language or "en").lower()
+    
+    if dataset_id in ["none", "null", "undefined", "empty"]:
+        if lang == "hi":
+            return {"prompts": ["प्रश्न पूछने के लिए डेटासेट अपलोड करें।", "एयरोस्पेस विश्लेषण देखने के लिए डेमो डेटासेट लोड करें।", "विज़न निरीक्षण के लिए विमान की छवि अपलोड करें।"]}
+        elif lang == "kn":
+            return {"prompts": ["ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳಲು ಡೇಟಾಸೆಟ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.", "ಏರೋಸ್ಪೇಸ್ ವಿಶ್ಲೇಷಣೆಗಾಗಿ ಡೆಮೊ ಡೇಟಾಸೆಟ್ ಲೋಡ್ ಮಾಡಿ.", "ವಿಷನ್ ತಪಾಸಣೆಗಾಗಿ ವಿಮಾನದ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."]}
+        return {"prompts": ["Upload a dataset to start asking questions.", "Load the demo dataset to explore aerospace analytics.", "Upload an aircraft image for vision airframe inspection."]}
+
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        dataset = db.query(Dataset).first()
+        
+    if not dataset:
+        if lang == "hi":
+            return {"prompts": ["प्रश्न पूछने के लिए डेटासेट अपलोड करें।"]}
+        elif lang == "kn":
+            return {"prompts": ["ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳಲು ಡೇಟಾಸೆಟ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."]}
+        return {"prompts": ["Upload a dataset to start asking questions."]}
+
+    tbl = dataset.duckdb_table_name
+    schema = duckdb_manager.get_table_schema(tbl)
+    sample_rows = duckdb_manager.fetch_sample_rows(tbl, limit=4)
+    
+    from app.services.prompt_service import prompt_service
+    prompts = prompt_service.generate_dynamic_prompts(
+        table_name=tbl,
+        columns=schema,
+        sample_rows=sample_rows,
+        language=lang
+    )
+    return {
+        "dataset_id": dataset.id,
+        "dataset_name": dataset.name,
+        "language": lang,
+        "prompts": prompts
+    }

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Message } from "@/lib/types";
-import { Copy, Check, Volume2, VolumeX, Terminal, Layers, ChevronDown, ChevronUp } from "lucide-react";
+import { Copy, Check, Volume2, VolumeX, Terminal, Layers, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
 import RAGTransparencyPanel from "./RAGTransparencyPanel";
@@ -15,6 +15,9 @@ export default function MessageItem({ message }: MessageItemProps) {
   const isAssistant = message.role === "assistant";
   const [copied, setCopied] = useState(false);
   const [isPlayingAudio, setIsPlaying] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isRagPanelOpen, setIsRagPanelOpen] = useState(false);
 
   const handleCopySQL = () => {
@@ -25,19 +28,115 @@ export default function MessageItem({ message }: MessageItemProps) {
     }
   };
 
-  const handleSpeak = () => {
-    if (!("speechSynthesis" in window)) return;
-    if (isPlayingAudio) {
-      window.speechSynthesis.cancel();
+  const cleanTextForVoice = (raw: string): string => {
+    return raw
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/`[^`]*`/g, "")
+      .replace(/[*_]{1,3}/g, "")
+      .replace(/#+\s*/g, "")
+      .replace(/\|[^\n]+\|/g, "")
+      .replace(/[•\-\*]\s+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const handleSpeak = async () => {
+    setAudioError(null);
+
+    // If currently playing, stop both HTML Audio and Browser TTS
+    if (isPlayingAudio || isLoadingAudio) {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
       setIsPlaying(false);
+      setIsLoadingAudio(false);
       return;
     }
+
+    const cleaned = cleanTextForVoice(message.content);
+    if (!cleaned) return;
+
+    // Automatic Language Detection (Hindi Devanagari, Kannada, English)
+    let detectedLang = message.language || "en";
+    if (/[\u0900-\u097F]/.test(cleaned)) {
+      detectedLang = "hi";
+    } else if (/[\u0C80-\u0CFF]/.test(cleaned)) {
+      detectedLang = "kn";
+    }
+
+    setIsLoadingAudio(true);
+
+    try {
+      const { fetchSpeechAudio } = await import("@/lib/api");
+      const audioBlob = await fetchSpeechAudio(cleaned, detectedLang);
+
+      if (audioBlob) {
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        setCurrentAudio(audio);
+
+        audio.onplay = () => {
+          setIsPlaying(true);
+          setIsLoadingAudio(false);
+        };
+        audio.onended = () => {
+          setIsPlaying(false);
+          URL.revokeObjectURL(audioUrl);
+        };
+        audio.onerror = () => {
+          setIsPlaying(false);
+          setIsLoadingAudio(false);
+          fallbackBrowserTTS(cleaned, detectedLang);
+        };
+
+        await audio.play();
+        return;
+      }
+    } catch {
+      // Backend TTS unavailable, fallback to browser
+    }
+
+    // Fallback: Browser Web Speech Synthesis
+    fallbackBrowserTTS(cleaned, detectedLang);
+  };
+
+  const fallbackBrowserTTS = (text: string, lang: string) => {
+    if (!("speechSynthesis" in window)) {
+      setIsLoadingAudio(false);
+      setIsPlaying(false);
+      setAudioError("Text-to-speech not supported on this browser.");
+      return;
+    }
+
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(message.content);
-    u.lang = message.language === "hi" ? "hi-IN" : message.language === "kn" ? "kn-IN" : "en-US";
-    u.onend   = () => setIsPlaying(false);
-    u.onerror = () => setIsPlaying(false);
-    setIsPlaying(true);
+    const u = new SpeechSynthesisUtterance(text);
+    const targetLang = lang === "hi" ? "hi-IN" : lang === "kn" ? "kn-IN" : "en-US";
+    u.lang = targetLang;
+
+    // Match browser voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const matchingVoice = voices.find((v) => v.lang.toLowerCase().startsWith(lang));
+    if (matchingVoice) {
+      u.voice = matchingVoice;
+    }
+
+    u.onstart = () => {
+      setIsPlaying(true);
+      setIsLoadingAudio(false);
+    };
+    u.onend = () => {
+      setIsPlaying(false);
+    };
+    u.onerror = (e) => {
+      setIsPlaying(false);
+      setIsLoadingAudio(false);
+      setAudioError("Speech output failed. Please check sound settings.");
+    };
+
     window.speechSynthesis.speak(u);
   };
 
@@ -206,6 +305,7 @@ export default function MessageItem({ message }: MessageItemProps) {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSpeak}
+                disabled={isLoadingAudio}
                 className={clsx(
                   "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-all",
                   isPlayingAudio && "animate-pulse"
@@ -215,13 +315,23 @@ export default function MessageItem({ message }: MessageItemProps) {
                   border: "1px solid var(--border)",
                   color: isPlayingAudio ? "var(--accent-soft)" : "var(--text-muted)",
                 }}
-                title={isPlayingAudio ? "Stop Audio" : "Listen"}
+                title={isPlayingAudio ? "Stop Audio" : isLoadingAudio ? "Synthesizing voice..." : "Listen"}
               >
-                {isPlayingAudio
-                  ? <VolumeX className="w-3 h-3" />
-                  : <Volume2 className="w-3 h-3" />}
-                <span>{isPlayingAudio ? "Playing" : "Speak"}</span>
+                {isLoadingAudio ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-[var(--accent-soft)]" />
+                ) : isPlayingAudio ? (
+                  <VolumeX className="w-3 h-3 text-[var(--accent-soft)]" />
+                ) : (
+                  <Volume2 className="w-3 h-3" />
+                )}
+                <span>{isLoadingAudio ? "Loading..." : isPlayingAudio ? "Stop" : "Speak"}</span>
               </button>
+
+              {audioError && (
+                <span className="text-[11px] text-amber-500 font-medium">
+                  {audioError}
+                </span>
+              )}
 
               {/* RAG Transparency Icon Button (Only shown if RAG was actually used) */}
               {message.rag_metadata && message.rag_metadata.used_rag && (

@@ -14,15 +14,11 @@ interface ChatWindowProps {
   onDemoPromptClick: (text: string) => void;
   hasDataset: boolean;
   activeDatasetName?: string;
+  activeDatasetNames?: string[];
   language: Language;
+  suggestedPrompts?: string[];
+  isLoadingPrompts?: boolean;
 }
-
-const QUICK_PROMPTS = [
-  "How many helicopters are in this dataset?",
-  "Which manufacturer has the most helicopters?",
-  "What is the average flight hour?",
-  "Show me active helicopters.",
-];
 
 const CAPABILITIES = [
   {
@@ -48,13 +44,26 @@ const CAPABILITIES = [
 function GreetingBlock({
   hasDataset,
   activeDatasetName,
+  activeDatasetNames,
   onOpenDatasetUpload,
   onOpenImageUpload,
   onDemoPromptClick,
-}: Omit<ChatWindowProps, "messages" | "isLoading" | "language">) {
+  suggestedPrompts = [],
+  isLoadingPrompts = false,
+  language,
+}: Omit<ChatWindowProps, "messages" | "isLoading">) {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  const numDatasets = activeDatasetNames?.length || (hasDataset ? 1 : 0);
+
+  const displayPrompts = suggestedPrompts.length > 0 ? suggestedPrompts : [
+    language === "hi" ? "डेटासेट में कितने हेलीकॉप्टर हैं?" : language === "kn" ? "ಈ ಡೇಟಾಸೆಟ್‌ನಲ್ಲಿ ಎಷ್ಟು ಹೆಲಿಕಾಪ್ಟರ್‌ಗಳಿವೆ?" : "How many helicopters are in this dataset?",
+    language === "hi" ? "शीर्ष 5 निर्माताओं की सूची दिखाएं।" : language === "kn" ? "ಟಾಪ್ 5 ತಯಾರಕರ ಪಟ್ಟಿಯನ್ನು ತೋರಿಸಿ." : "Show the top 5 manufacturers.",
+    language === "hi" ? "कुल घटनाओं की संख्या क्या है?" : language === "kn" ? "ಒಟ್ಟು ಘಟನೆಗಳ ಸಂಖ್ಯೆ ಎಷ್ಟು?" : "What is the total number of incidents?",
+    language === "hi" ? "सक्रिय हेलीकॉप्टरों का विवरण दें।" : language === "kn" ? "ಸಕ್ರಿಯ ಹೆಲಿಕಾಪ್ಟರ್‌ಗಳನ್ನು ತೋರಿಸಿ." : "Show me active helicopters.",
+  ];
 
   return (
     <motion.div
@@ -69,11 +78,25 @@ function GreetingBlock({
           {greeting}, Janavi{" "}
           <span className="text-2xl">👋</span>
         </h2>
-        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          {hasDataset
-            ? `Your helidata assistant is ready. Dataset: "${activeDatasetName}"`
-            : "Your helicopter data assistant is ready."}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {numDatasets > 1 ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+              <Database className="w-3.5 h-3.5" />
+              {numDatasets} Datasets Injected Simultaneously ({activeDatasetNames?.join(", ")})
+            </span>
+          ) : hasDataset ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                  style={{ background: "var(--accent-light)", color: "var(--accent-soft)", border: "1px solid var(--border-hover)" }}>
+              <Database className="w-3.5 h-3.5" />
+              Active Dataset: "{activeDatasetName}"
+            </span>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              Your helicopter data assistant is ready.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Chat input placeholder suggestion */}
@@ -85,60 +108,81 @@ function GreetingBlock({
           color: "var(--text-muted)",
         }}
       >
-        Ask anything about your dataset...
+        {numDatasets > 1
+          ? "Ask any question across your injected datasets — text-to-SQL will query the right tables automatically..."
+          : "Ask anything about your dataset..."}
       </div>
 
       {/* Quick action buttons */}
       <div className="flex flex-wrap gap-3">
         <button
           onClick={onOpenDatasetUpload}
-          className="btn-primary text-sm py-2.5 px-5"
+          className="btn-primary text-sm py-2.5 px-5 flex items-center gap-2"
         >
           <Database className="w-4 h-4" />
-          {hasDataset ? "Change Dataset" : "Upload Dataset"}
+          {hasDataset ? "Manage / Inject Datasets" : "Upload Dataset"}
         </button>
         <button
           onClick={onOpenImageUpload}
-          className="btn-secondary text-sm py-2.5 px-5"
+          className="btn-secondary text-sm py-2.5 px-5 flex items-center gap-2"
         >
           <ImageIcon className="w-4 h-4" />
           Upload Image
         </button>
       </div>
 
-      {/* Quick prompt chips */}
+      {/* Dynamic Suggested Prompts */}
       <div>
-        <p className="text-xs font-semibold mb-3 flex items-center gap-1.5"
-           style={{ color: "var(--text-muted)" }}>
-          <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--accent-soft)" }} />
-          Try asking
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {QUICK_PROMPTS.map((prompt) => (
-            <button
-              key={prompt}
-              onClick={() => onDemoPromptClick(prompt)}
-              className="text-left px-4 py-3 rounded-xl text-sm transition-all"
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--border-hover)";
-                (e.currentTarget as HTMLElement).style.color = "var(--accent-soft)";
-                (e.currentTarget as HTMLElement).style.background = "var(--accent-light)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
-                (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
-                (e.currentTarget as HTMLElement).style.background = "var(--surface)";
-              }}
-            >
-              {prompt}
-            </button>
-          ))}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold flex items-center gap-1.5"
+             style={{ color: "var(--text-muted)" }}>
+            <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--accent-soft)" }} />
+            {hasDataset ? "Dynamic Questions from Your Dataset Schema" : "Suggested questions"}
+          </p>
+          {hasDataset && (
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full"
+                  style={{ background: "var(--bg-tertiary)", color: "var(--accent-soft)" }}>
+              Dynamic Prompts
+            </span>
+          )}
         </div>
+
+        {isLoadingPrompts ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-14 rounded-xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {displayPrompts.map((prompt, idx) => (
+              <button
+                key={`${prompt}-${idx}`}
+                onClick={() => onDemoPromptClick(prompt)}
+                className="text-left px-4 py-3 rounded-xl text-sm transition-all flex items-start justify-between group"
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "var(--border-hover)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--accent-soft)";
+                  (e.currentTarget as HTMLElement).style.background = "var(--accent-light)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
+                  (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+                }}
+              >
+                <span className="leading-snug">{prompt}</span>
+                <Sparkles className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ml-2 mt-0.5"
+                          style={{ color: "var(--accent-soft)" }} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Capability cards */}
@@ -173,7 +217,10 @@ export default function ChatWindow({
   onDemoPromptClick,
   hasDataset,
   activeDatasetName,
+  activeDatasetNames,
   language,
+  suggestedPrompts = [],
+  isLoadingPrompts = false,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -187,9 +234,13 @@ export default function ChatWindow({
         <GreetingBlock
           hasDataset={hasDataset}
           activeDatasetName={activeDatasetName}
+          activeDatasetNames={activeDatasetNames}
           onOpenDatasetUpload={onOpenDatasetUpload}
           onOpenImageUpload={onOpenImageUpload}
           onDemoPromptClick={onDemoPromptClick}
+          suggestedPrompts={suggestedPrompts}
+          isLoadingPrompts={isLoadingPrompts}
+          language={language}
         />
       ) : (
         <div className="max-w-3xl mx-auto space-y-3">
@@ -235,6 +286,38 @@ export default function ChatWindow({
                 </div>
               </div>
             </motion.div>
+          {/* Subtle follow-up dynamic prompt pills */}
+          {!isLoading && suggestedPrompts.length > 0 && (
+            <div className="pt-3 pb-1">
+              <div className="flex items-center gap-1.5 mb-2 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                <Sparkles className="w-3 h-3" style={{ color: "var(--accent-soft)" }} />
+                <span>Dynamic Dataset Prompts:</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestedPrompts.slice(0, 3).map((prompt, i) => (
+                  <button
+                    key={`followup-${i}`}
+                    onClick={() => onDemoPromptClick(prompt)}
+                    className="text-left px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5"
+                    style={{
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-secondary)",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.borderColor = "var(--border-hover)";
+                      (e.currentTarget as HTMLElement).style.color = "var(--accent-soft)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+                      (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
+                    }}
+                  >
+                    <span>{prompt}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           <div ref={bottomRef} />

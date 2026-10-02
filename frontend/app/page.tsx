@@ -19,7 +19,12 @@ export default function Home() {
   const [activeTab, setActiveTab]     = useState<"chat" | "dashboard" | "history">("chat");
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  const [allDatasets, setAllDatasets]       = useState<Dataset[]>([]);
+  const [selectedDatasetIds, setSelectedDatasetIds] = useState<string[]>([]);
   const [currentDataset, setCurrentDataset] = useState<Dataset | null>(null);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState<boolean>(false);
+
   const [messages, setMessages]             = useState<Message[]>([]);
   const [currentConvId, setCurrentConvId]   = useState<string | undefined>(undefined);
   const [chatMode, setChatMode]             = useState<ChatMode>("nlp");
@@ -30,18 +35,75 @@ export default function Home() {
   const [isImageModalOpen,   setIsImageModalOpen]   = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 
+  // Load existing datasets on mount
   useEffect(() => {
     (async () => {
       try {
         const datasets = await fetchDatasets();
-        if (datasets?.length > 0) setCurrentDataset(datasets[0]);
+        if (datasets?.length > 0) {
+          setAllDatasets(datasets);
+          setCurrentDataset(datasets[0]);
+          setSelectedDatasetIds([datasets[0].id]);
+        }
       } catch {}
     })();
   }, []);
 
+  // Dynamically fetch schema-tailored suggested prompts when dataset or language changes
+  useEffect(() => {
+    let isSubscribed = true;
+    setIsLoadingPrompts(true);
+    fetchSuggestedPrompts(currentDataset?.id, language)
+      .then((prompts) => {
+        if (isSubscribed) {
+          setSuggestedPrompts(prompts);
+          setIsLoadingPrompts(false);
+        }
+      })
+      .catch(() => {
+        if (isSubscribed) setIsLoadingPrompts(false);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [currentDataset?.id, language]);
+
   const handleStartLanding = () => setScreen("dashboard");
 
-  const handleDatasetLoaded = (dataset: Dataset) => setCurrentDataset(dataset);
+  const handleDatasetLoaded = (dataset: Dataset) => {
+    setAllDatasets((prev) => {
+      const exists = prev.some((d) => d.id === dataset.id);
+      return exists ? prev : [dataset, ...prev];
+    });
+    setSelectedDatasetIds((prev) => Array.from(new Set([...prev, dataset.id])));
+    setCurrentDataset(dataset);
+  };
+
+  const handleToggleDataset = (id: string) => {
+    setSelectedDatasetIds((prev) => {
+      const exists = prev.includes(id);
+      let updated: string[];
+      if (exists) {
+        if (prev.length === 1) return prev; // Keep at least one selected
+        updated = prev.filter((dId) => dId !== id);
+      } else {
+        updated = [...prev, id];
+      }
+      const primary = allDatasets.find((d) => d.id === updated[0]) || null;
+      setCurrentDataset(primary);
+      return updated;
+    });
+  };
+
+  const handleSelectAllDatasets = () => {
+    const allIds = allDatasets.map((d) => d.id);
+    setSelectedDatasetIds(allIds);
+  };
+
+  const activeDatasetNames = allDatasets
+    .filter((d) => selectedDatasetIds.includes(d.id))
+    .map((d) => d.name);
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isSending) return;
@@ -61,6 +123,7 @@ export default function Home() {
       const res = await sendChatMessage({
         question: text,
         dataset_id: currentDataset?.id,
+        dataset_ids: selectedDatasetIds.length > 0 ? selectedDatasetIds : undefined,
         conversation_id: currentConvId,
         mode: chatMode,
         language,
@@ -166,6 +229,10 @@ export default function Home() {
               language={language}
               setLanguage={setLanguage}
               onOpenDatasetModal={() => setIsDatasetModalOpen(true)}
+              allDatasets={allDatasets}
+              selectedDatasetIds={selectedDatasetIds}
+              onToggleDataset={handleToggleDataset}
+              onSelectAllDatasets={handleSelectAllDatasets}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -179,7 +246,10 @@ export default function Home() {
                     onDemoPromptClick={handleSendMessage}
                     hasDataset={!!currentDataset}
                     activeDatasetName={currentDataset?.name}
+                    activeDatasetNames={activeDatasetNames}
                     language={language}
+                    suggestedPrompts={suggestedPrompts}
+                    isLoadingPrompts={isLoadingPrompts}
                   />
 
                   {/* Chat input area */}

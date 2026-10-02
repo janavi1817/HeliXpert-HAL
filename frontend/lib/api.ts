@@ -83,6 +83,7 @@ export async function fetchDatasetPreview(
 export async function sendChatMessage(payload: {
   question: string;
   dataset_id?: string;
+  dataset_ids?: string[];
   conversation_id?: string;
   mode: "nlp" | "rag";
   language: "en" | "hi" | "kn";
@@ -106,6 +107,56 @@ export async function sendChatMessage(payload: {
     throw new Error(err.detail || "Chat error");
   }
   return res.json();
+}
+
+export async function fetchSuggestedPrompts(
+  datasetId?: string,
+  language: "en" | "hi" | "kn" = "en"
+): Promise<string[]> {
+  const targetId = datasetId || "none";
+  try {
+    const res = await fetch(`${API_BASE}/datasets/${targetId}/suggested-prompts?language=${language}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.prompts && data.prompts.length > 0) {
+        return data.prompts;
+      }
+    }
+  } catch {}
+
+  if (language === "hi") {
+    return [
+      "प्रश्न पूछने के लिए डेटासेट अपलोड करें।",
+      "एयरोस्पेस विश्लेषण देखने के लिए डेमो डेटासेट लोड करें।",
+      "विज़न निरीक्षण के लिए विमान की छवि अपलोड करें。"
+    ];
+  } else if (language === "kn") {
+    return [
+      "ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳಲು ಡೇಟಾಸೆಟ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.",
+      "ಏರೋಸ್ಪೇಸ್ ವಿಶ್ಲೇಷಣೆಗಾಗಿ ಡೆಮೊ ಡೇಟಾಸೆಟ್ ಲೋಡ್ ಮಾಡಿ.",
+      "ವಿಷನ್ ತಪಾಸಣೆಗಾಗಿ ವಿಮಾನದ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
+    ];
+  }
+  return [
+    "Upload a dataset to start asking questions.",
+    "Load the demo dataset to explore aerospace analytics.",
+    "Upload an aircraft image for vision airframe inspection."
+  ];
+}
+
+export async function fetchSpeechAudio(text: string, language: string = "en"): Promise<Blob | null> {
+  const res = await fetch(`${API_BASE}/voice/speak`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, language }),
+  });
+  if (!res.ok) return null;
+  // If backend signaled fallback to browser TTS
+  if (res.headers.get("X-Use-Browser-TTS") === "true") {
+    return null;
+  }
+  const blob = await res.blob();
+  return blob.size > 100 ? blob : null;
 }
 
 export async function uploadImageFile(file: File): Promise<{ id: string; url: string; original_name: string }> {

@@ -18,6 +18,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 class ChatRequest(BaseModel):
     question: str
     dataset_id: Optional[str] = None
+    dataset_ids: Optional[List[str]] = None # Supports 2 or more datasets injected together
     image_id: Optional[str] = None
     conversation_id: Optional[str] = None
     mode: Optional[str] = "nlp" # "nlp" or "rag" (Data Query)
@@ -29,13 +30,14 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
     Precision Multi-Modal QA & Text-to-SQL Pipeline:
     1. If image_id is provided: Analyzes uploaded image with Gemini Vision
     2. If dataset question:
-       a. Query Router classifies structured data queries (single source of truth = DuckDB)
-       b. Dynamically inspects table schema from DuckDB
-       c. SQL Agent generates read-only DuckDB SQL using schema reflection
-       d. SQL Validator verifies read-only safety
-       e. DuckDB executes query against actual data
-       f. RAG retrieves optional contextual support (labeled as contextual, never overriding DuckDB)
-       g. Answer Agent synthesizes grounded response with Answer Validation in requested mode
+       a. Supports 1 or multiple injected datasets simultaneously
+       b. Query Router classifies structured data queries (single source of truth = DuckDB)
+       c. Dynamically inspects table schemas across all injected datasets
+       d. SQL Agent generates read-only DuckDB SQL targeting relevant table(s)
+       e. SQL Validator verifies read-only safety
+       f. DuckDB executes query against actual data
+       g. RAG retrieves optional contextual support (labeled as contextual, never overriding DuckDB)
+       h. Answer Agent synthesizes grounded response with Answer Validation in requested mode
     3. Saves message history
     """
     question = req.question.strip()
@@ -89,15 +91,19 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
                 "vision_result": vision_result
             }
 
-    # ── BRANCH 2: Dataset Question ───────────────────────────────────────────
-    dataset = None
-    if req.dataset_id:
-        dataset = db.query(Dataset).filter(Dataset.id == req.dataset_id).first()
-    
-    if not dataset:
-        dataset = db.query(Dataset).first()
+    # ── BRANCH 2: Dataset Question (Single or Multi-Dataset Injected) ────────
+    active_datasets: List[Dataset] = []
+    if req.dataset_ids and len(req.dataset_ids) > 0:
+        active_datasets = db.query(Dataset).filter(Dataset.id.in_(req.dataset_ids)).all()
+    elif req.dataset_id and req.dataset_id != "all":
+        single_d = db.query(Dataset).filter(Dataset.id == req.dataset_id).first()
+        if single_d:
+            active_datasets = [single_d]
 
-    if not dataset:
+    if not active_datasets:
+        active_datasets = db.query(Dataset).all()
+
+    if not active_datasets:
         return {
             "mode": req.mode,
             "question": question,
@@ -107,54 +113,64 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             "language": req.language or "en"
         }
 
-    # Retrieve live schema and sample rows from DuckDB
-    table_name = dataset.duckdb_table_name
-    if not duckdb_manager.table_exists(table_name) and dataset.file_path and Path(dataset.file_path).exists():
-        from app.services.dataset_service import dataset_service
-        try:
-            import re
-            df = dataset_service.load_df_from_file(Path(dataset.file_path), dataset.file_type)
-            sanitized_cols = []
-            seen_cols = {}
-            for i, col in enumerate(df.columns):
-                clean = re.sub(r'[^a-zA-Z0-9_]+', '_', str(col).strip()).strip('_').lower()
-                if not clean:
-                    clean = f"col_{i+1}"
-                if clean in seen_cols:
-                    seen_cols[clean] += 1
-                    clean = f"{clean}_{seen_cols[clean]}"
-                else:
-                    seen_cols[clean] = 0
-                sanitized_cols.append(clean)
-            df.columns = sanitized_cols
-            duckdb_manager.create_table_from_df(table_name, df)
-        except Exception:
-            pass
+    # Prepare table schemas and sample rows for all injected datasets
+    tables_info = []
+    combined_columns = []
+    from app.services.dataset_service import dataset_service
 
-    schema = duckdb_manager.get_table_schema(table_name)
-    sample_rows = duckdb_manager.fetch_sample_rows(table_name, limit=3)
+    for d in active_datasets:
+        tbl = d.duckdb_table_name
+        if not duckdb_manager.table_exists(tbl) and d.file_path and Path(d.file_path).exists():
+            try:
+                import re
+                df = dataset_service.load_df_from_file(Path(d.file_path), d.file_type)
+                sanitized_cols = []
+                seen_cols = {}
+                for i, col in enumerate(df.columns):
+                    clean = re.sub(r'[^a-zA-Z0-9_]+', '_', str(col).strip()).strip('_').lower()
+                    if not clean:
+                        clean = f"col_{i+1}"
+                    if clean in seen_cols:
+                        seen_cols[clean] += 1
+                        clean = f"{clean}_{seen_cols[clean]}"
+                    else:
+                        seen_cols[clean] = 0
+                    sanitized_cols.append(clean)
+                df.columns = sanitized_cols
+                duckdb_manager.create_table_from_df(tbl, df)
+            except Exception:
+                pass
 
-    # 1. Query Router: Classify query (Rule #7)
-    route_info = query_router.classify(question=question, columns=schema)
+        schema = duckdb_manager.get_table_schema(tbl)
+        sample = duckdb_manager.fetch_sample_rows(tbl, limit=3)
+        combined_columns.extend(schema)
+        tables_info.append({
+            "dataset_id": d.id,
+            "dataset_name": d.name,
+            "table_name": tbl,
+            "schema": schema,
+            "sample_rows": sample
+        })
 
-    # 2. Text-to-SQL Generation Step (Dynamic Schema Inspection)
-    sql_response = sql_agent.generate_sql(
+    # 1. Query Router: Classify query across combined schemas
+    route_info = query_router.classify(question=question, columns=combined_columns)
+
+    # 2. Text-to-SQL Generation Step (Multi-Dataset Aware)
+    sql_response = sql_agent.generate_sql_multi(
         question=question,
-        table_name=table_name,
-        columns=schema,
-        sample_rows=sample_rows
+        tables_info=tables_info
     )
 
     # 3. Check if requested data is unavailable in the schema
     if sql_response["status"] == "data_not_available":
-        reason = sql_response.get("reason", "The requested columns or fields are not present in this dataset.")
+        reason = sql_response.get("reason", "The requested columns or fields are not present in the injected dataset(s).")
         
         if req.language == "hi":
-            answer_text = f"इस डेटासेट में इस प्रश्न का उत्तर देने के लिए आवश्यक जानकारी उपलब्ध नहीं है ({reason})।"
+            answer_text = f"इंजेक्‍ट किए गए डेटासेट में इस प्रश्न का उत्तर देने के लिए आवश्यक जानकारी उपलब्ध नहीं है ({reason})।"
         elif req.language == "kn":
-            answer_text = f"ಈ ಡೇಟಾಸೆಟ್‌ನಲ್ಲಿ ಈ ಪ್ರಶ್ನೆಗೆ ಉತ್ತರಿಸಲು ಅಗತ್ಯವಾದ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ ({reason})."
+            answer_text = f"ಇಂಜೆಕ್ಟ್ ಮಾಡಲಾದ ಡೇಟಾಸೆಟ್‌ನಲ್ಲಿ ಈ ಪ್ರಶ್ನೆಗೆ ಉತ್ತರಿಸಲು ಅಗತ್ಯವಾದ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ ({reason})."
         else:
-            answer_text = f"This dataset does not contain the information required to answer that question. Reason: {reason}"
+            answer_text = f"The injected dataset(s) do not contain the information required to answer that question. Reason: {reason}"
 
         return {
             "mode": req.mode,
@@ -176,8 +192,9 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         }
 
     generated_sql = sql_response["sql"]
+    primary_dataset_name = sql_response.get("target_dataset") or ", ".join([d.name for d in active_datasets])
 
-    # 4. Execute Query in DuckDB (Single Source of Truth)
+    # 4. Execute Query in DuckDB (Single Source of Truth across injected tables)
     try:
         columns, result_rows = duckdb_manager.execute_read_only(generated_sql, max_rows=100)
     except Exception as e:
@@ -201,7 +218,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         short_title = question[:35] + ("..." if len(question) > 35 else "")
         conversation = Conversation(
             id=conv_id,
-            dataset_id=dataset.id,
+            dataset_id=active_datasets[0].id if active_datasets else None,
             title=short_title
         )
         db.add(conversation)
@@ -214,15 +231,16 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         from app.services.rag_service import rag_service
         from app.services.dataset_service import dataset_service
         import pandas as pd
-        if dataset.file_path and Path(dataset.file_path).exists():
-            df_for_rag = dataset_service.load_df_from_file(Path(dataset.file_path), dataset.file_type)
+        primary_d = active_datasets[0]
+        if primary_d.file_path and Path(primary_d.file_path).exists():
+            df_for_rag = dataset_service.load_df_from_file(Path(primary_d.file_path), primary_d.file_type)
         else:
-            _, sample_records = duckdb_manager.execute_read_only(f'SELECT * FROM "{table_name}" LIMIT 80')
+            _, sample_records = duckdb_manager.execute_read_only(f'SELECT * FROM "{primary_d.duckdb_table_name}" LIMIT 80')
             df_for_rag = pd.DataFrame(sample_records)
 
         rag_metadata = rag_service.retrieve(
             query=question,
-            dataset_name=dataset.name,
+            dataset_name=primary_d.name,
             df=df_for_rag,
             conversation_id=conv_id,
             top_k=3,
@@ -273,7 +291,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         "answer": answer_text,
         "language": req.language or "en",
         "conversation_id": conv_id,
-        "dataset_name": dataset.name,
+        "dataset_name": primary_dataset_name,
         "rag_metadata": rag_metadata
     }
 

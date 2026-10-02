@@ -278,4 +278,82 @@ class SQLAgent:
 
         return f'SELECT * FROM "{table_name}"{where_sql} LIMIT 10', "Dataset records preview", "table"
 
+    @classmethod
+    def generate_sql_multi(
+        cls,
+        question: str,
+        tables_info: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Supports multiple datasets injected simultaneously.
+        Enables user to query across 2 or more datasets.
+        """
+        if not tables_info:
+            return {"status": "data_not_available", "sql": None, "reason": "No datasets injected."}
+        if len(tables_info) == 1:
+            t = tables_info[0]
+            return cls.generate_sql(question, t["table_name"], t["schema"], t["sample_rows"])
+
+        # Format multi-table prompt
+        tables_formatted = []
+        for i, t in enumerate(tables_info, 1):
+            cols_str = ", ".join([f"{c['name']} ({c['type']})" for c in t["schema"][:14]])
+            samples_str = json.dumps(t["sample_rows"][:2], default=str)
+            tables_formatted.append(
+                f"Table {i}: \"{t['table_name']}\" (Dataset: {t['dataset_name']})\n"
+                f"Columns: {cols_str}\n"
+                f"Sample Rows: {samples_str}\n"
+            )
+        all_tables_str = "\n".join(tables_formatted)
+
+        # 1. Try Gemini
+        if gemini_client.is_configured():
+            prompt = (
+                f"You are HeliXpert's Multi-Dataset Text-to-SQL Engine for DuckDB.\n"
+                f"The user has injected multiple datasets into DuckDB simultaneously:\n\n"
+                f"{all_tables_str}\n\n"
+                f"CRITICAL RULES:\n"
+                f"1. Determine which table contains the relevant columns to answer the user's question.\n"
+                f"2. Generate an exact, read-only DuckDB SQL query.\n"
+                f"3. Always quote table names exactly as shown (e.g. \"{tables_info[0]['table_name']}\").\n"
+                f"4. If asking across datasets, you can use UNION ALL or JOIN if schemas allow.\n"
+                f"5. Return JSON: {{\"status\": \"success\" | \"data_not_available\", \"sql\": \"...\", \"reason\": \"...\", \"target_dataset\": \"name\"}}\n"
+            )
+            data = gemini_client.generate_json(f"{prompt}\nUser Question: {question}\nGenerate JSON:", temperature=0.0)
+            if data and isinstance(data, dict):
+                if data.get("status") == "success" and data.get("sql"):
+                    sql_to_run = data["sql"].strip()
+                    if sql_to_run.upper().startswith("SELECT"):
+                        return {
+                            "status": "success",
+                            "sql": sql_to_run,
+                            "reason": data.get("reason", "Multi-dataset analytical query"),
+                            "target_dataset": data.get("target_dataset", tables_info[0]["dataset_name"])
+                        }
+
+        # 2. Schema scoring fallback to pick best matching table
+        q_lower = question.lower()
+        q_toks = set(re.findall(r"[a-z0-9_]+", q_lower))
+        best_score = -1
+        best_table = tables_info[0]
+        for t in tables_info:
+            score = 0
+            d_name = t["dataset_name"].lower()
+            if any(tok in d_name for tok in q_toks if len(tok) >= 3):
+                score += 40
+            for c in t["schema"]:
+                c_name = c["name"].lower()
+                if c_name in q_lower:
+                    score += 15
+                elif any(tok in c_name for tok in q_toks if len(tok) >= 4):
+                    score += 6
+            if score > best_score:
+                best_score = score
+                best_table = t
+
+        res = cls.generate_sql(question, best_table["table_name"], best_table["schema"], best_table["sample_rows"])
+        res["target_dataset"] = best_table["dataset_name"]
+        return res
+
 sql_agent = SQLAgent()
+
