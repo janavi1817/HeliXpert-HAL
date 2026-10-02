@@ -49,6 +49,8 @@ class Conversation(Base):
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     dataset_id = Column(String(36), ForeignKey("datasets.id"), nullable=True)
     title = Column(String(255), default="Helicopter Intelligence Session")
+    mode = Column(String(20), default="nlp")
+    active_datasets = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -68,6 +70,7 @@ class Message(Base):
     mode = Column(String(20), default="nlp") # nlp, rag/query
     language = Column(String(10), default="en") # en, hi, kn
     rag_metadata = Column(JSON, nullable=True)
+    chosen_datasets = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     conversation = relationship("Conversation", back_populates="messages")

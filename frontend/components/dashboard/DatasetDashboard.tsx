@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { fetchDatasets, fetchDatasetStatistics, fetchDatasetCharts, fetchAllDatasetsOverview } from "@/lib/api";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  fetchDatasets,
+  fetchDatasetStatistics,
+  fetchDatasetCharts,
+  fetchAllDatasetsOverview,
+  deleteDataset
+} from "@/lib/api";
 import { Dataset, DatasetSummary, ColumnStat, ChartConfig, AllDatasetsOverview } from "@/lib/types";
 import OverviewCards from "./OverviewCards";
 import DatasetCharts from "./DatasetCharts";
@@ -18,7 +24,8 @@ import {
   ArrowRight,
   HardDrive,
   FileSpreadsheet,
-  Check
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,6 +35,7 @@ interface DatasetDashboardProps {
   datasetName?: string;
   datasets?: Dataset[];
   onSelectDataset?: (dataset: Dataset) => void;
+  onDeleteDataset?: (datasetId: string) => void;
 }
 
 const TABS = [
@@ -40,7 +48,8 @@ export default function DatasetDashboard({
   datasetId,
   datasetName,
   datasets = [],
-  onSelectDataset
+  onSelectDataset,
+  onDeleteDataset
 }: DatasetDashboardProps) {
   const [datasetList, setDatasetList] = useState<Dataset[]>(datasets);
   const [selectedId, setSelectedId] = useState<string>(datasetId || (datasets[0]?.id ?? "all"));
@@ -58,25 +67,49 @@ export default function DatasetDashboard({
   const [allDatasetsSummaries, setAllDatasetsSummaries] = useState<Record<string, DatasetSummary>>({});
   const [isLoadingAll, setIsLoadingAll] = useState(false);
 
-  // Sync datasetList if prop changes or fetch if empty
+  // Delete modal state
+  const [datasetToDelete, setDatasetToDelete] = useState<Dataset | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Dropdown open state & ref
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Sync datasetList if prop changes or fetch if empty; auto-select newly added dataset
   useEffect(() => {
     if (datasets && datasets.length > 0) {
       setDatasetList(datasets);
+      // If datasetId changed or newly extracted dataset arrived, switch to it immediately
+      if (datasetId && datasets.some((d) => d.id === datasetId)) {
+        setSelectedId(datasetId);
+      } else if (!datasets.some((d) => d.id === selectedId) && selectedId !== "all") {
+        setSelectedId(datasets[0]?.id ?? "all");
+      }
     } else {
       fetchDatasets()
         .then((data) => {
           setDatasetList(data);
-          if (!selectedId && data.length > 0) {
+          if ((!selectedId || selectedId === "all") && data.length > 0) {
             setSelectedId(data[0].id);
           }
         })
         .catch((err) => console.error("Failed to load dataset list:", err));
     }
-  }, [datasets]);
+  }, [datasets, datasetId]);
 
   // Sync selectedId with incoming datasetId prop
   useEffect(() => {
-    if (datasetId && datasetId !== selectedId && selectedId !== "all") {
+    if (datasetId && datasetId !== selectedId) {
       setSelectedId(datasetId);
     }
   }, [datasetId]);
@@ -111,7 +144,7 @@ export default function DatasetDashboard({
       const summariesMap: Record<string, DatasetSummary> = {};
 
       await Promise.all(
-        overview.datasets.map(async (d) => {
+        overview.datasets.map(async (d: any) => {
           try {
             const [cRes, sRes] = await Promise.all([
               fetchDatasetCharts(d.id),
@@ -154,6 +187,33 @@ export default function DatasetDashboard({
     setSelectedId(newId);
   };
 
+  // Dataset deletion logic
+  const confirmDelete = async () => {
+    if (!datasetToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteDataset(datasetToDelete.id);
+      const updated = datasetList.filter((d) => d.id !== datasetToDelete.id);
+      setDatasetList(updated);
+
+      if (onDeleteDataset) {
+        onDeleteDataset(datasetToDelete.id);
+      }
+
+      if (selectedId === datasetToDelete.id) {
+        setSelectedId(updated[0]?.id ?? "all");
+      } else if (selectedId === "all") {
+        loadAllDatasets();
+      }
+      setDatasetToDelete(null);
+    } catch (err: any) {
+      console.error("Failed to delete dataset:", err);
+      alert(err.message || "Failed to delete dataset.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -178,39 +238,143 @@ export default function DatasetDashboard({
             </p>
           </div>
 
-          {/* ── SELECT DATASET DROPDOWN (Requirement 2) ── */}
+          {/* ── SELECT DATASET DROPDOWN WITH EMBEDDED DELETE OPTION (Requirement 2) ── */}
           <div className="flex items-center gap-2 pt-1 sm:pt-0">
             <span className="text-xs font-semibold uppercase tracking-wider shrink-0"
                   style={{ color: "var(--text-muted)" }}>
               Select Dataset:
             </span>
 
-            <div className="relative">
-              <select
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
                 id="dataset-selector-dropdown"
-                value={selectedId}
-                onChange={(e) => handleSelectionChange(e.target.value)}
-                className="appearance-none text-xs font-semibold py-2 pl-3.5 pr-9 rounded-xl cursor-pointer transition-all outline-none"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 text-xs font-semibold py-2 px-3.5 rounded-xl transition-all border outline-none cursor-pointer"
                 style={{
                   background: "var(--bg-tertiary)",
                   color: "var(--text-primary)",
-                  border: "1px solid var(--border-hover)",
+                  borderColor: isDropdownOpen ? "var(--accent-soft)" : "var(--border-hover)",
                   boxShadow: "var(--shadow-sm)",
                 }}
               >
-                <option value="all">
-                  🌟 All Datasets ({datasetList.length} Total Combined)
-                </option>
-                {datasetList.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    📊 {d.name} ({d.row_count} rows · {d.column_count} cols)
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                className="w-4 h-4 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2"
-                style={{ color: "var(--text-muted)" }}
-              />
+                <span className="truncate max-w-[200px] sm:max-w-[260px]">
+                  {selectedId === "all"
+                    ? `🌟 All Datasets (${datasetList.length} Total Combined)`
+                    : `📊 ${currentDatasetObj?.name || "Select Dataset"}`}
+                </span>
+                <ChevronDown
+                  className={clsx(
+                    "w-4 h-4 transition-transform text-[var(--text-muted)] shrink-0",
+                    isDropdownOpen && "rotate-180"
+                  )}
+                />
+              </button>
+
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 mt-2 w-72 rounded-2xl z-50 overflow-hidden shadow-2xl border"
+                    style={{
+                      background: "var(--bg-secondary)",
+                      borderColor: "var(--border-hover)",
+                      boxShadow: "var(--shadow-xl)",
+                      backdropFilter: "blur(20px)",
+                    }}
+                  >
+                    {/* Header */}
+                    <div className="px-3.5 py-2.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                        Select Dataset
+                      </span>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-px w-full" style={{ background: "var(--border)" }} />
+
+                    {/* Datasets list */}
+                    <div className="py-1 max-h-56 overflow-y-auto">
+                      {/* All Datasets option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleSelectionChange("all");
+                          setIsDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs flex items-center justify-between transition-colors hover:bg-[var(--accent-light)]"
+                        style={{
+                          color: selectedId === "all" ? "var(--accent-soft)" : "var(--text-primary)",
+                          fontWeight: selectedId === "all" ? 600 : 400,
+                        }}
+                      >
+                        <span>🌟 All Datasets</span>
+                        {selectedId === "all" && <span className="text-[11px] text-emerald-400 font-bold">✓</span>}
+                      </button>
+
+                      {/* Individual Datasets */}
+                      {datasetList.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            handleSelectionChange(d.id);
+                            setIsDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3.5 py-2 text-xs flex items-center justify-between transition-colors hover:bg-[var(--accent-light)]"
+                          style={{
+                            color: selectedId === d.id ? "var(--accent-soft)" : "var(--text-primary)",
+                            fontWeight: selectedId === d.id ? 600 : 400,
+                          }}
+                        >
+                          <div className="truncate min-w-0 pr-2">
+                            <span className="font-medium block truncate">📊 {d.name}</span>
+                            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                              {d.row_count} rows · {d.column_count} cols
+                            </span>
+                          </div>
+                          {selectedId === d.id && <span className="text-[11px] text-emerald-400 font-bold shrink-0">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-px w-full" style={{ background: "var(--border)" }} />
+
+                    {/* Delete Option Section */}
+                    <div className="p-1.5">
+                      {selectedId !== "all" && currentDatasetObj ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            setDatasetToDelete(currentDatasetObj);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center gap-2 transition-all font-semibold hover:bg-red-500/15"
+                          style={{
+                            color: "#ef4444",
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                          <span>Delete {currentDatasetObj.name}</span>
+                        </button>
+                      ) : (
+                        <div className="px-3 py-1.5 text-[11px] flex items-center justify-between"
+                             style={{ color: "var(--text-muted)" }}>
+                          <span>Delete Dataset</span>
+                          <span className="text-[10px] italic">(Select a dataset above)</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Divider */}
+                    <div className="h-px w-full" style={{ background: "var(--border)" }} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
@@ -329,7 +493,7 @@ export default function DatasetDashboard({
                   Active Dataset Catalog ({datasetList.length} Datasets Available)
                 </h3>
                 <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                  Click any dataset to inspect isolated analytics
+                  Select or delete any dataset directly
                 </span>
               </div>
 
@@ -434,13 +598,15 @@ export default function DatasetDashboard({
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleSelectionChange(d.id)}
-                        className="btn-secondary text-xs py-1.5 px-4 rounded-xl flex items-center gap-1.5 self-start sm:self-auto"
-                      >
-                        <span>Full Dataset View</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <button
+                          onClick={() => handleSelectionChange(d.id)}
+                          className="btn-secondary text-xs py-1.5 px-4 rounded-xl flex items-center gap-1.5"
+                        >
+                          <span>Full Dataset View</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Isolated KPIs */}
@@ -492,6 +658,89 @@ export default function DatasetDashboard({
           </div>
         )
       )}
+
+      {/* ── CONFIRMATION MODAL FOR DATASET DELETION ── */}
+      <AnimatePresence>
+        {datasetToDelete && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)" }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 14 }}
+              className="w-full max-w-md rounded-3xl p-6 space-y-4"
+              style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border-hover)",
+                boxShadow: "var(--shadow-xl)",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid rgba(239, 68, 68, 0.25)",
+                  }}
+                >
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
+                    Delete Dataset
+                  </h3>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Permanent removal from DuckDB
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className="p-3.5 rounded-2xl text-xs space-y-1.5"
+                style={{
+                  background: "var(--bg-tertiary)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <p style={{ color: "var(--text-primary)" }}>
+                  Are you sure you want to delete{" "}
+                  <span className="font-bold text-red-400">"{datasetToDelete.name}"</span>?
+                </p>
+                <p style={{ color: "var(--text-muted)" }} className="text-[11px]">
+                  DuckDB table <code className="font-mono text-purple-400">{datasetToDelete.duckdb_table_name}</code> ({datasetToDelete.row_count} rows) will be permanently dropped and vector cache cleared.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setDatasetToDelete(null)}
+                  className="btn-secondary text-xs py-2 px-4 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={confirmDelete}
+                  className="text-xs py-2 px-4 rounded-xl font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                  style={{
+                    background: "#ef4444",
+                    color: "#ffffff",
+                    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.3)",
+                  }}
+                >
+                  {isDeleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isDeleting ? "Deleting..." : "Delete Dataset"}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

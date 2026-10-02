@@ -15,7 +15,10 @@ import {
   FileText,
   ImageIcon,
   FolderArchive,
-  ArrowRight
+  ArrowRight,
+  XCircle,
+  Plus,
+  RefreshCw
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import clsx from "clsx";
@@ -77,8 +80,8 @@ export default function DatasetUploadModal({
       setErrorMsg(`Unsupported file type '${ext}'. Supported: CSV, XLSX, JSON, Parquet, PDF, TXT, DOCX, Images, ZIP.`);
       return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-      setErrorMsg("File exceeds 50 MB limit.");
+    if (file.size > 500 * 1024 * 1024) {
+      setErrorMsg("File exceeds 500 MB limit.");
       return;
     }
     setSelectedFile(file);
@@ -97,13 +100,15 @@ export default function DatasetUploadModal({
         confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
       } catch {}
 
+      // Immediately pass newly extracted dataset(s) so dropdown updates instantly
+      onDatasetLoaded(res);
+
       if (res.is_zip || (res.processed && res.processed.length > 1)) {
         setIsProcessing(false);
         setProgressIndex(-1);
         setZipResult(res);
       } else {
         setTimeout(() => {
-          onDatasetLoaded(res);
           onClose();
           setIsProcessing(false);
           setProgressIndex(-1);
@@ -115,6 +120,27 @@ export default function DatasetUploadModal({
       setIsProcessing(false);
       setProgressIndex(-1);
       setErrorMsg(err.message || "Upload failed. Please try again.");
+    }
+  };
+
+  const handleCancelDataset = () => {
+    setSelectedFile(null);
+    setErrorMsg(null);
+    setProgressIndex(-1);
+    setIsProcessing(false);
+    const input = document.getElementById("dataset-file-input") as HTMLInputElement;
+    if (input) input.value = "";
+  };
+
+  const handleAddAnotherDataset = () => {
+    setSelectedFile(null);
+    setErrorMsg(null);
+    setProgressIndex(-1);
+    setIsProcessing(false);
+    const input = document.getElementById("dataset-file-input") as HTMLInputElement;
+    if (input) {
+      input.value = "";
+      setTimeout(() => input.click(), 50);
     }
   };
 
@@ -193,7 +219,7 @@ export default function DatasetUploadModal({
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                 {zipResult
                   ? `${zipResult.package_name} · ${zipResult.total_files || (zipResult.processed?.length || 0)} files scanned`
-                  : "CSV, XLSX, JSON, Parquet, PDF, DOCX, TXT, Images, ZIP · Max 50 MB"}
+                  : "CSV, XLSX, JSON, Parquet, PDF, DOCX, TXT, Images, ZIP · Max 500 MB"}
               </p>
             </div>
           </div>
@@ -210,18 +236,53 @@ export default function DatasetUploadModal({
           </button>
         </div>
 
-        {/* Error */}
+        {/* Error / Failure Banner with Action Options */}
         {errorMsg && (
           <div
-            className="flex items-center gap-2 p-3 rounded-2xl text-xs"
+            className="p-3.5 rounded-2xl text-xs space-y-2.5"
             style={{
               background: "rgba(239,68,68,0.08)",
               border: "1px solid rgba(239,68,68,0.25)",
               color: "#ef4444",
             }}
           >
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>{errorMsg}</span>
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="font-semibold block">Dataset Ingestion Issue</span>
+                <span className="opacity-90">{errorMsg}</span>
+              </div>
+            </div>
+
+            {/* Cancel Dataset and Add Another Dataset Buttons */}
+            <div className="flex items-center gap-2 pt-1 border-t border-red-500/20 flex-wrap">
+              <button
+                type="button"
+                onClick={handleCancelDataset}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-medium transition-all hover:bg-red-500/20"
+                style={{
+                  background: "rgba(239,68,68,0.12)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                }}
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Cancel Dataset</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAddAnotherDataset}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-semibold transition-all hover:brightness-110 ml-auto"
+                style={{
+                  background: "var(--accent)",
+                  color: "#ffffff",
+                }}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Another Dataset</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -414,14 +475,31 @@ export default function DatasetUploadModal({
             </div>
 
             {selectedFile ? (
-              <>
+              <div className="space-y-1">
                 <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                   {selectedFile.name}
                 </p>
-                <p className="text-xs mt-1" style={{ color: "#10b981" }}>
-                  {(selectedFile.size / 1024).toFixed(1)} KB — Ready to upload
+                <p className="text-xs" style={{ color: errorMsg ? "#ef4444" : "#10b981" }}>
+                  {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB — {errorMsg ? "Upload failed" : "Ready to upload"}
                 </p>
-              </>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCancelDataset();
+                  }}
+                  className="mt-2 text-[11px] px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1 font-medium hover:bg-red-500/20"
+                  style={{
+                    background: "rgba(239,68,68,0.1)",
+                    color: "#ef4444",
+                    border: "1px solid rgba(239,68,68,0.25)",
+                  }}
+                  title="Cancel selected dataset"
+                >
+                  <XCircle className="w-3 h-3" />
+                  <span>Cancel Dataset</span>
+                </button>
+              </div>
             ) : (
               <>
                 <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
@@ -485,7 +563,7 @@ export default function DatasetUploadModal({
         {/* Actions */}
         {!isProcessing && !zipResult && (
           <div className="space-y-3">
-            {selectedFile && (
+            {selectedFile && !errorMsg && (
               <button
                 onClick={() => processUpload(selectedFile)}
                 className="btn-primary w-full justify-center py-3 text-sm rounded-full"
@@ -494,6 +572,28 @@ export default function DatasetUploadModal({
                   ? "Extract & Process ZIP Package"
                   : "Process & Ingest Dataset"}
               </button>
+            )}
+
+            {selectedFile && errorMsg && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancelDataset}
+                  className="btn-secondary flex-1 justify-center py-2.5 text-xs rounded-full flex items-center gap-1.5"
+                  style={{ borderColor: "rgba(239,68,68,0.3)", color: "#ef4444" }}
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>Cancel Dataset</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddAnotherDataset}
+                  className="btn-primary flex-1 justify-center py-2.5 text-xs rounded-full flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Another Dataset</span>
+                </button>
+              </div>
             )}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px" style={{ background: "var(--border)" }} />

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Database, Languages, Terminal, MessageSquare, ChevronDown, Sun, Moon, Bell } from "lucide-react";
-import { ChatMode, Language } from "@/lib/types";
+import { ChatMode, Language, Dataset } from "@/lib/types";
 import { useTheme } from "@/lib/theme";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";

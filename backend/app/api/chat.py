@@ -98,6 +98,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             "dataset_id": d.id,
             "dataset_name": d.name,
             "table_name": tbl,
+            "original_filename": d.original_filename,
             "schema": schema,
             "sample_rows": sample,
             "row_count": d.row_count,
@@ -163,7 +164,22 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
                         f"Cross-referencing with active dataset `{target_d['name']}` for identified rotorcraft **{identified_model}**:{specs_summary}"
                     )
 
-                _save_conversation(db, conv_id, question, answer_text, req.mode, req.language, sql=spec_query if req.mode == "rag" else None, result=spec_rows if req.mode == "rag" else None)
+                chosen_datasets = [{
+                    "id": target_d["id"],
+                    "name": target_d["name"],
+                    "original_filename": target_d.get("original_filename") or Path(target_d.get("file_path", "")).name or target_d["name"],
+                    "file_name": target_d.get("original_filename") or Path(target_d.get("file_path", "")).name or target_d["name"],
+                    "file_type": target_d.get("file_type", "csv"),
+                    "used_for": "DuckDB"
+                }]
+
+                _save_conversation(
+                    db, conv_id, question, answer_text, req.mode, req.language,
+                    sql=spec_query if req.mode == "rag" else None,
+                    result=spec_rows if req.mode == "rag" else None,
+                    chosen_datasets=chosen_datasets,
+                    dataset_name=target_d["name"]
+                )
                 return {
                     "mode": req.mode or "nlp",
                     "question": question,
@@ -173,19 +189,21 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
                     "dataset_name": target_d["name"],
                     "sql": spec_query if req.mode == "rag" else None,
                     "result": spec_rows if req.mode == "rag" else None,
-                    "vision_result": vision_result
+                    "vision_result": vision_result,
+                    "chosen_datasets": chosen_datasets
                 }
             else:
                 # Requirement 9: Pure Image Analysis (Independent capability)
                 answer_text = vision_result.get("detailed_analysis", "Image analysis complete.")
-                _save_conversation(db, conv_id, question, answer_text, req.mode, req.language)
+                _save_conversation(db, conv_id, question, answer_text, req.mode, req.language, chosen_datasets=None)
                 return {
                     "mode": req.mode or "nlp",
                     "question": question,
                     "answer": answer_text,
                     "language": req.language or "en",
                     "conversation_id": conv_id,
-                    "vision_result": vision_result
+                    "vision_result": vision_result,
+                    "chosen_datasets": None
                 }
 
     if not tables_info:
@@ -255,6 +273,25 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         ]
         combined_dataset_name = f"{d1['name']} & {d2['name']}"
 
+        chosen_datasets = [
+            {
+                "id": d1["id"],
+                "name": d1["name"],
+                "original_filename": d1.get("original_filename") or Path(d1.get("file_path", "")).name or d1["name"],
+                "file_name": d1.get("original_filename") or Path(d1.get("file_path", "")).name or d1["name"],
+                "file_type": d1.get("file_type", "csv"),
+                "used_for": "DuckDB"
+            },
+            {
+                "id": d2["id"],
+                "name": d2["name"],
+                "original_filename": d2.get("original_filename") or Path(d2.get("file_path", "")).name or d2["name"],
+                "file_name": d2.get("original_filename") or Path(d2.get("file_path", "")).name or d2["name"],
+                "file_type": d2.get("file_type", "csv"),
+                "used_for": "DuckDB"
+            }
+        ]
+
         # Synthesize grounded answer
         answer_text = _synthesize_multi_dataset_answer(
             question=question,
@@ -266,7 +303,13 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             language=req.language or "en"
         )
 
-        _save_conversation(db, conv_id, question, answer_text, req.mode, req.language, sql=combined_sql if req.mode == "rag" else None, result=combined_rows if req.mode == "rag" else None)
+        _save_conversation(
+            db, conv_id, question, answer_text, req.mode, req.language,
+            sql=combined_sql if req.mode == "rag" else None,
+            result=combined_rows if req.mode == "rag" else None,
+            chosen_datasets=chosen_datasets,
+            dataset_name=combined_dataset_name
+        )
 
         response_payload = {
             "mode": req.mode or "nlp",
@@ -275,7 +318,8 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             "language": req.language or "en",
             "conversation_id": conv_id,
             "dataset_name": combined_dataset_name,
-            "rag_metadata": None
+            "rag_metadata": None,
+            "chosen_datasets": chosen_datasets
         }
         if req.mode == "rag" or "sql" in question.lower():
             response_payload["sql"] = combined_sql
@@ -307,6 +351,16 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
                 used_duckdb=False
             )
             if rag_doc_meta and rag_doc_meta.get("retrieved_chunks"):
+                doc_name = rag_doc_meta["retrieved_chunks"][0]["source"]
+                doc_ext = doc_name.split(".")[-1].upper() if "." in doc_name else "DOCUMENT"
+                doc_chosen = [{
+                    "id": rag_doc_meta.get("document_id") or "doc_rag_source",
+                    "name": doc_name,
+                    "original_filename": doc_name,
+                    "file_name": doc_name,
+                    "file_type": doc_ext,
+                    "used_for": "RAG"
+                }]
                 doc_context_str = "\n".join([c["content"] for c in rag_doc_meta["retrieved_chunks"]])
                 doc_answer = answer_agent.generate_response(
                     question=question,
@@ -316,7 +370,12 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
                     language=req.language or "en",
                     rag_context=doc_context_str
                 )
-                _save_conversation(db, conv_id, question, doc_answer, req.mode, req.language, rag_meta=rag_doc_meta)
+                _save_conversation(
+                    db, conv_id, question, doc_answer, req.mode, req.language,
+                    rag_meta=rag_doc_meta,
+                    chosen_datasets=doc_chosen,
+                    dataset_name=doc_name
+                )
                 return {
                     "mode": req.mode,
                     "question": question,
@@ -324,8 +383,9 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
                     "result": None,
                     "answer": doc_answer,
                     "language": req.language or "en",
-                    "dataset_name": rag_doc_meta["retrieved_chunks"][0]["source"],
-                    "rag_metadata": rag_doc_meta
+                    "dataset_name": doc_name,
+                    "rag_metadata": rag_doc_meta,
+                    "chosen_datasets": doc_chosen
                 }
         except Exception:
             pass
@@ -345,9 +405,9 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             "result": None,
             "answer": answer_text,
             "language": req.language or "en",
-            "dataset_name": chosen_dataset["name"]
+            "dataset_name": chosen_dataset["name"],
+            "chosen_datasets": None
         }
-
 
     generated_sql = sql_response["sql"]
 
@@ -362,7 +422,8 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             "result": None,
             "answer": f"Database execution error on '{chosen_dataset['name']}': {str(e)}",
             "language": req.language or "en",
-            "dataset_name": chosen_dataset["name"]
+            "dataset_name": chosen_dataset["name"],
+            "chosen_datasets": None
         }
 
     # Isolated RAG Retrieval strictly for this target dataset (Requirement 8)
@@ -399,7 +460,26 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         rag_context=rag_context_str
     )
 
-    _save_conversation(db, conv_id, question, answer_text, req.mode, req.language, sql=generated_sql if req.mode == "rag" else None, result=result_rows if req.mode == "rag" else None)
+    has_rag_chunks = bool(rag_metadata and rag_metadata.get("retrieved_chunks") and len(rag_metadata["retrieved_chunks"]) > 0)
+    used_for_label = "DuckDB & RAG" if has_rag_chunks else "DuckDB"
+    
+    single_chosen = [{
+        "id": chosen_dataset["id"],
+        "name": chosen_dataset["name"],
+        "original_filename": chosen_dataset.get("original_filename") or Path(chosen_dataset.get("file_path", "")).name or chosen_dataset["name"],
+        "file_name": chosen_dataset.get("original_filename") or Path(chosen_dataset.get("file_path", "")).name or chosen_dataset["name"],
+        "file_type": chosen_dataset.get("file_type", "csv"),
+        "used_for": used_for_label
+    }]
+
+    _save_conversation(
+        db, conv_id, question, answer_text, req.mode, req.language,
+        sql=generated_sql if req.mode == "rag" else None,
+        result=result_rows if req.mode == "rag" else None,
+        rag_meta=rag_metadata,
+        chosen_datasets=single_chosen,
+        dataset_name=chosen_dataset["name"]
+    )
 
     response_payload = {
         "mode": req.mode or "nlp",
@@ -408,7 +488,8 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         "language": req.language or "en",
         "conversation_id": conv_id,
         "dataset_name": chosen_dataset["name"],
-        "rag_metadata": rag_metadata
+        "rag_metadata": rag_metadata,
+        "chosen_datasets": single_chosen
     }
 
     if req.mode == "rag" or "sql" in question.lower():
@@ -485,12 +566,90 @@ def _synthesize_multi_dataset_answer(
         f"**From `{d2_name}`:**\n{r2_str}"
     )
 
-def _save_conversation(db: Session, conv_id: str, question: str, answer_text: str, mode: Optional[str], language: Optional[str], sql: Optional[str] = None, result: Optional[Any] = None):
+def _generate_session_title(question: str, dataset_name: Optional[str] = None) -> str:
+    """
+    Dynamically generates a meaningful 3 to 6 word aerospace session title.
+    Never uses a hardcoded or naive slice title.
+    """
+    if gemini_client.is_configured():
+        prompt = (
+            f"You are HeliXpert's Aerospace Session Classifier.\n"
+            f"Generate a concise, meaningful 3 to 6 word session title for this user inquiry: \"{question}\"\n"
+            f"Dataset context: {dataset_name or 'Helicopter Fleet Analytics'}\n"
+            f"Rules:\n"
+            f"1. Maximum 6 words.\n"
+            f"2. Return ONLY the title string. No quotes, no markdown, no punctuation.\n"
+            f"Example: Helicopter Accident Analysis, Fleet Range Specifications, Engine Maintenance Records."
+        )
+        try:
+            t = gemini_client.generate_text(prompt, temperature=0.2)
+            if t and len(t.strip()) > 3:
+                clean_title = re.sub(r'[\"#*_`]+', '', t).strip()
+                if 3 <= len(clean_title) <= 55:
+                    return clean_title
+        except Exception:
+            pass
+
+    # Heuristic intelligent aerospace extraction fallback
+    cleaned = re.sub(r'^(what\s+is|what\s+are|how\s+many|show\s+me|list\s+all|can\s+you\s+tell\s+me|which|who|where|why|find|calculate|tell\s+me\s+about)\s+', '', question, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r'[?!.,;:]+$', '', cleaned).strip()
+    if cleaned:
+        words = cleaned.split()
+        cand = " ".join(words[:5]).title()
+        if len(cand) >= 4:
+            return cand
+
+    return f"{dataset_name} Analysis" if dataset_name else "Helicopter Flight Intelligence"
+
+def _save_conversation(
+    db: Session,
+    conv_id: str,
+    question: str,
+    answer_text: str,
+    mode: Optional[str],
+    language: Optional[str],
+    sql: Optional[str] = None,
+    result: Optional[Any] = None,
+    rag_meta: Optional[Dict[str, Any]] = None,
+    chosen_datasets: Optional[List[Dict[str, Any]]] = None,
+    dataset_name: Optional[str] = None
+):
+    from datetime import datetime
     conversation = db.query(Conversation).filter(Conversation.id == conv_id).first()
+    
+    active_names = [d["name"] for d in (chosen_datasets or []) if "name" in d]
+    primary_d_id = chosen_datasets[0]["id"] if (chosen_datasets and chosen_datasets[0].get("id")) else None
+
     if not conversation:
-        conversation = Conversation(id=conv_id, title=question[:35])
+        title = _generate_session_title(question, dataset_name)
+        conversation = Conversation(
+            id=conv_id,
+            title=title,
+            mode=mode or "nlp",
+            dataset_id=primary_d_id,
+            active_datasets=active_names,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
         db.add(conversation)
         db.flush()
+    else:
+        conversation.updated_at = datetime.utcnow()
+        if mode:
+            conversation.mode = mode
+        if active_names:
+            curr = list(conversation.active_datasets or [])
+            conversation.active_datasets = list(dict.fromkeys(curr + active_names))
+        if primary_d_id and not conversation.dataset_id:
+            conversation.dataset_id = primary_d_id
+        # Automatically update title if it is default or generic
+        if not conversation.title or conversation.title in [
+            "New Helicopter Analysis",
+            "Helicopter Intelligence Session",
+            "New Chat",
+            "New Session"
+        ]:
+            conversation.title = _generate_session_title(question, dataset_name)
 
     user_msg = Message(
         id=str(uuid.uuid4()),
@@ -509,6 +668,8 @@ def _save_conversation(db: Session, conv_id: str, question: str, answer_text: st
         content=answer_text,
         sql_query=sql,
         query_result=result,
+        rag_metadata=rag_meta,
+        chosen_datasets=chosen_datasets if chosen_datasets else None,
         mode=mode or "nlp",
         language=language or "en"
     )

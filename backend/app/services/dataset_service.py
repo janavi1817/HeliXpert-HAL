@@ -199,8 +199,8 @@ class DatasetService:
                     if info.compress_size > 0 and (info.file_size / info.compress_size) > 100:
                         raise HTTPException(status_code=400, detail="ZIP bomb detected: Uncompressed ratio exceeds security threshold.")
 
-                if total_uncompressed > 250 * 1024 * 1024:
-                    raise HTTPException(status_code=400, detail="Extracted ZIP size exceeds security limit (250MB).")
+                if total_uncompressed > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+                    raise HTTPException(status_code=400, detail=f"Extracted ZIP size exceeds security limit ({settings.MAX_UPLOAD_SIZE_MB}MB).")
 
                 # 2. Extract with strict Path Traversal protection
                 for info in infolist:

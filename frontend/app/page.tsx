@@ -10,7 +10,7 @@ import ChatInput from "@/components/chat/ChatInput";
 import DatasetDashboard from "@/components/dashboard/DatasetDashboard";
 import DatasetUploadModal from "@/components/upload/DatasetUploadModal";
 import ImageUploadModal from "@/components/upload/ImageUploadModal";
-import HistoryDrawer from "@/components/sidebar/HistoryDrawer";
+import HistoryDrawer, { SessionData } from "@/components/sidebar/HistoryDrawer";
 import { fetchDatasets, sendChatMessage, fetchSuggestedPrompts } from "@/lib/api";
 import { Dataset, Message, ChatMode, Language } from "@/lib/types";
 
@@ -89,7 +89,28 @@ export default function Home() {
       });
   };
 
+  const handleDatasetDeleted = async (deletedId: string) => {
+    try {
+      const updatedList = await fetchDatasets();
+      setAllDatasets(updatedList);
+      setSelectedDatasetIds((prev) => prev.filter((id) => id !== deletedId));
+      if (currentDataset?.id === deletedId) {
+        setCurrentDataset(updatedList[0] || null);
+      }
+    } catch {
+      setAllDatasets((prev) => prev.filter((d) => d.id !== deletedId));
+      setSelectedDatasetIds((prev) => prev.filter((id) => id !== deletedId));
+      if (currentDataset?.id === deletedId) {
+        setCurrentDataset((prev) => {
+          const remaining = allDatasets.filter((d) => d.id !== deletedId);
+          return remaining[0] || null;
+        });
+      }
+    }
+  };
+
   const handleToggleDataset = (id: string) => {
+
     setSelectedDatasetIds((prev) => {
       const exists = prev.includes(id);
       let updated: string[];
@@ -149,6 +170,7 @@ export default function Home() {
           dataset_name: res.dataset_name || res.dataset_used,
           dataset_used: res.dataset_used || res.dataset_name,
           rag_metadata: res.rag_metadata,
+          chosen_datasets: res.chosen_datasets,
           mode: res.mode,
           language: res.language as Language,
           created_at: new Date().toISOString(),
@@ -177,13 +199,46 @@ export default function Home() {
     setActiveTab("chat");
   };
 
-  const handleSelectHistoryConversation = (
-    convId: string,
-    loadedMessages: Message[],
-    _title: string
-  ) => {
-    setCurrentConvId(convId);
-    setMessages(loadedMessages);
+  const handleSelectSession = (session: SessionData) => {
+    // 1. Restore conversation context / session id
+    setCurrentConvId(session.id || session.session_id);
+
+    // 2. Restore all messages
+    setMessages(session.messages || []);
+
+    // 3. Restore mode (Natural Language vs Data Query)
+    if (session.mode) {
+      setChatMode(session.mode);
+    }
+
+    // 4. Restore selected/active datasets & relevant dataset context
+    if (session.datasets_used && session.datasets_used.length > 0 && allDatasets.length > 0) {
+      const matched = allDatasets.filter((d) =>
+        session.datasets_used?.some(
+          (uName) =>
+            uName.toLowerCase() === d.name.toLowerCase() ||
+            uName.toLowerCase() === d.original_filename.toLowerCase()
+        )
+      );
+      if (matched.length > 0) {
+        setSelectedDatasetIds(matched.map((m) => m.id));
+        setCurrentDataset(matched[0]);
+      } else if (session.dataset_id) {
+        const found = allDatasets.find((d) => d.id === session.dataset_id);
+        if (found) {
+          setSelectedDatasetIds([found.id]);
+          setCurrentDataset(found);
+        }
+      }
+    } else if (session.dataset_id && allDatasets.length > 0) {
+      const found = allDatasets.find((d) => d.id === session.dataset_id);
+      if (found) {
+        setSelectedDatasetIds([found.id]);
+        setCurrentDataset(found);
+      }
+    }
+
+    // 5. Restore active tab to chat
     setActiveTab("chat");
   };
 
@@ -282,6 +337,7 @@ export default function Home() {
                   datasetName={currentDataset?.name}
                   datasets={allDatasets}
                   onSelectDataset={(d) => setCurrentDataset(d)}
+                  onDeleteDataset={handleDatasetDeleted}
                 />
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-5">
@@ -316,7 +372,8 @@ export default function Home() {
       <HistoryDrawer
         isOpen={isHistoryDrawerOpen}
         onClose={() => setIsHistoryDrawerOpen(false)}
-        onSelectConversation={handleSelectHistoryConversation}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
         currentConvId={currentConvId}
       />
     </div>

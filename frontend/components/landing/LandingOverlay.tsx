@@ -125,7 +125,7 @@ const STATS_CARDS = [
   { label: "Query Speed", value: "< 250ms", sub: "DuckDB In-Memory Engine" },
   { label: "Languages", value: "3 Ready", sub: "English, Hindi, Kannada" },
   { label: "Security", value: "100%", sub: "Read-Only AST Validation" },
-  { label: "Max Dataset", value: "50 MB", sub: "Up to 1M+ rows supported" },
+  { label: "Max Dataset", value: "500 MB", sub: "Up to 5M+ rows supported" },
 ];
 
 export default function LandingOverlay({ onStart }: LandingOverlayProps) {

@@ -556,3 +556,15 @@ button, a, input, textarea {
 /* Scrollbar none utility */
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── HIDE NEXT.JS DEV INDICATOR / TOOLBAR ─── */
+nextjs-portal,
+#next-dev-tools,
+[data-nextjs-dev-tools],
+[data-nextjs-toast],
+[data-next-dev-indicator],
+div[data-nextjs-dialog-overlay] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

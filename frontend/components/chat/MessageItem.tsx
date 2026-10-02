@@ -6,6 +6,7 @@ import { Copy, Check, Volume2, VolumeX, Terminal, Layers, ChevronDown, ChevronUp
 import clsx from "clsx";
 import { motion } from "framer-motion";
 import RAGTransparencyPanel from "./RAGTransparencyPanel";
+import ChosenDatasetPanel from "./ChosenDatasetPanel";
 import HelicopterLogo from "@/components/ui/HelicopterLogo";
 
 interface MessageItemProps {
@@ -20,6 +21,7 @@ export default function MessageItem({ message }: MessageItemProps) {
   const [audioError, setAudioError] = useState<string | null>(null);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isRagPanelOpen, setIsRagPanelOpen] = useState(false);
+  const [isChosenDatasetOpen, setIsChosenDatasetOpen] = useState(false);
 
   const handleCopySQL = () => {
     if (message.sql_query) {
@@ -403,6 +405,33 @@ export default function MessageItem({ message }: MessageItemProps) {
                   {isRagPanelOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               )}
+
+              {/* Chosen Dataset Icon Button (Beside RAG Transparency, only shown if dataset was actually used) */}
+              {message.chosen_datasets && message.chosen_datasets.length > 0 && (
+                <button
+                  onClick={() => setIsChosenDatasetOpen(!isChosenDatasetOpen)}
+                  className={clsx(
+                    "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-all border",
+                    isChosenDatasetOpen ? "font-semibold shadow-sm" : "hover:border-[var(--border-hover)]"
+                  )}
+                  style={{
+                    background: isChosenDatasetOpen ? "rgba(16, 185, 129, 0.15)" : "var(--bg-tertiary)",
+                    borderColor: isChosenDatasetOpen ? "rgba(16, 185, 129, 0.4)" : "var(--border)",
+                    color: isChosenDatasetOpen ? "#10b981" : "var(--text-secondary)",
+                  }}
+                  title="Inspect Chosen Dataset(s) used to generate this response"
+                >
+                  <Database className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Chosen Dataset</span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold"
+                    style={{ background: "var(--surface)", color: "#10b981" }}
+                  >
+                    {message.chosen_datasets.length}
+                  </span>
+                  {isChosenDatasetOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              )}
             </div>
 
             <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>
@@ -411,6 +440,11 @@ export default function MessageItem({ message }: MessageItemProps) {
                 : "Just now"}
             </span>
           </div>
+        )}
+
+        {/* Expandable Chosen Dataset Panel */}
+        {isAssistant && message.chosen_datasets && message.chosen_datasets.length > 0 && (
+          <ChosenDatasetPanel datasets={message.chosen_datasets} isOpen={isChosenDatasetOpen} />
         )}
 
         {/* Expandable RAG Transparency Panel */}

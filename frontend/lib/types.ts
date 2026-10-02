@@ -34,6 +34,7 @@ export interface Dataset {
   row_count: number;
   column_count: number;
   file_size_bytes: number;
+  duckdb_table_name?: string;
   is_demo?: boolean;
   created_at: string;
 }
@@ -145,6 +146,15 @@ export interface RAGMetadata {
   retrieved_chunks: RAGChunk[];
 }
 
+export interface ChosenDataset {
+  id?: string;
+  name: string;
+  original_filename?: string;
+  file_name?: string;
+  file_type?: string;
+  used_for: "DuckDB" | "RAG" | "DuckDB & RAG" | string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
@@ -154,6 +164,7 @@ export interface Message {
   dataset_name?: string | null;
   dataset_used?: string | null;
   rag_metadata?: RAGMetadata | null;
+  chosen_datasets?: ChosenDataset[] | null;
   mode?: ChatMode;
   language?: Language;
   created_at?: string;
@@ -162,11 +173,15 @@ export interface Message {
 
 export interface Conversation {
   id: string;
+  session_id?: string;
   title: string;
   dataset_id?: string;
+  mode?: ChatMode;
+  datasets_used?: string[];
   created_at: string;
   updated_at: string;
   message_count?: number;
+  messages?: Message[];
 }
 
 export interface VisionAnalysis {

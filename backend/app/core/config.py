@@ -43,7 +43,7 @@ class Settings:
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
     # Limits
-    MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"))
+    MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "500"))
     MAX_QUERY_ROWS: int = int(os.getenv("MAX_QUERY_ROWS", "1000"))
 
 settings = Settings()

@@ -207,12 +207,12 @@ def preview_dataset_data(
 
 @router.delete("/{dataset_id}")
 def delete_dataset(dataset_id: str, db: Session = Depends(get_db)):
-    """Delete dataset record and its DuckDB table"""
+    """Delete dataset record, its DuckDB table, RAG vectors, and disk storage"""
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
     
-    # Drop table from DuckDB
+    # 1. Drop table from DuckDB
     try:
         from duckdb import connect
         from app.database.duckdb_manager import DUCKDB_PATH
@@ -221,10 +221,25 @@ def delete_dataset(dataset_id: str, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    # Purge any cached RAG indexes/vectors for this dataset
+    # 2. Purge any cached RAG indexes/vectors for this dataset
     try:
         from app.services.rag_service import rag_service
         rag_service.clear_dataset_cache(dataset.name)
+    except Exception:
+        pass
+
+    # 3. Unlink conversations pointing to this dataset to prevent foreign key issues
+    try:
+        from app.database.models import Conversation
+        db.query(Conversation).filter(Conversation.dataset_id == dataset_id).update({"dataset_id": None})
+    except Exception:
+        pass
+
+    # 4. Remove file from storage if present
+    try:
+        from pathlib import Path
+        if dataset.file_path and Path(dataset.file_path).exists():
+            Path(dataset.file_path).unlink()
     except Exception:
         pass
 

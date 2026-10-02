@@ -1,4 +1,17 @@
-import { Dataset, DatasetSummary, ColumnStat, ChartConfig, Message, ImageAnalysisResponse, RAGMetadata } from "./types";
+import {
+  Dataset,
+  DatasetSummary,
+  ColumnStat,
+  ChartConfig,
+  Message,
+  ImageAnalysisResponse,
+  RAGMetadata,
+  UploadResponse,
+  AllDatasetsOverview,
+  ChosenDataset,
+  ChatMode,
+  Language,
+} from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
@@ -35,11 +48,22 @@ export async function fetchAllDatasetsOverview(): Promise<AllDatasetsOverview> {
 }
 
 export async function fetchDatasetDetails(id: string): Promise<Dataset> {
-
   const res = await fetch(`${API_BASE}/datasets/${id}`);
   if (!res.ok) throw new Error("Failed to fetch dataset details");
   return res.json();
 }
+
+export async function deleteDataset(id: string): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/datasets/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Failed to delete dataset" }));
+    throw new Error(errorData.detail || "Failed to delete dataset");
+  }
+  return res.json();
+}
+
 
 export async function fetchDatasetStatistics(id: string): Promise<{
   dataset_id: string;
@@ -91,6 +115,7 @@ export async function sendChatMessage(payload: {
   question: string;
   dataset_id?: string;
   dataset_ids?: string[];
+  image_id?: string;
   conversation_id?: string;
   mode: "nlp" | "rag";
   language: "en" | "hi" | "kn";
@@ -105,6 +130,8 @@ export async function sendChatMessage(payload: {
   dataset_name?: string;
   dataset_used?: string;
   rag_metadata?: RAGMetadata | null;
+  chosen_datasets?: ChosenDataset[] | null;
+  vision_result?: any;
 }> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",
@@ -223,10 +250,22 @@ export async function fetchConversations(): Promise<{
 
 export async function fetchConversationDetails(id: string): Promise<{
   id: string;
+  session_id: string;
   title: string;
+  dataset_id?: string;
+  mode?: ChatMode;
+  datasets_used?: string[];
+  created_at: string;
+  updated_at: string;
   messages: Message[];
 }> {
   const res = await fetch(`${API_BASE}/conversations/${id}`);
   if (!res.ok) throw new Error("Failed to fetch conversation");
+  return res.json();
+}
+
+export async function deleteConversation(id: string): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/conversations/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete conversation");
   return res.json();
 }
