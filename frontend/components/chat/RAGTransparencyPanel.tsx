@@ -269,6 +269,21 @@ export default function RAGTransparencyPanel({
             </span>
           </div>
 
+          {/* ── Rule 8: Contextual Relevance Disclaimer ── */}
+          <div
+            className="mb-2.5 p-2.5 rounded-xl flex items-center gap-2 border text-[11px]"
+            style={{
+              background: "rgba(245, 158, 11, 0.08)",
+              borderColor: "rgba(245, 158, 11, 0.25)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            <Info className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span>
+              <strong>Notice:</strong> Retrieved for contextual relevance; not used as the source of the numerical result.
+            </span>
+          </div>
+
           <div className="space-y-2.5">
             {retrieved_chunks.map((chunk: RAGChunk) => {
               const scorePct = Math.round(chunk.similarity_score * 100);

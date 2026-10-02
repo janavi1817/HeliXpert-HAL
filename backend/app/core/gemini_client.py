@@ -17,8 +17,8 @@ class GeminiClient:
 
     def __init__(self):
         # Candidate model waterfall in priority order (fastest & tested first)
-        primary_model = getattr(settings, "GEMINI_MODEL", "gemini-3-flash-preview")
-        candidates = [primary_model, "gemini-3-flash-preview", "gemini-flash-latest", "gemma-4-26b-a4b-it", "gemini-3.8-flash"]
+        primary_model = getattr(settings, "GEMINI_MODEL", "gemini-3.5-flash")
+        candidates = [primary_model, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemma-4-26b-a4b-it"]
         # Deduplicate while preserving order
         self.model_candidates = []
         for m in candidates:

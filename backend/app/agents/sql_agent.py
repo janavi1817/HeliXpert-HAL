@@ -23,10 +23,17 @@ CRITICAL RULES:
    - If the user's question asks for attributes, metrics, entities, or concepts that DO NOT exist in the provided schema (for example, asking for geographic location/city/country when no location columns exist, or pilot names when no pilot column exists):
      YOU MUST RETURN status "data_not_available".
      DO NOT guess. DO NOT substitute an unrelated column. DO NOT invent columns.
-5. For counting: use COUNT(*).
-6. For string searches: use ILIKE '%value%' or UPPER(col) LIKE '%VALUE%' for case-insensitive matching.
-7. For ordering: use ORDER BY <col> DESC/ASC LIMIT <n>.
-8. Output ONLY a valid JSON object with the following schema:
+5. AGGREGATIONS & GROUPINGS:
+   - When asked 'Which <entity> had the highest/most/lowest <events/accidents/count>', group by that entity and count:
+     SELECT "<entity>", COUNT(*) AS count FROM "{table_name}" [WHERE filters] GROUP BY "<entity>" ORDER BY count DESC LIMIT 1
+   - If a boolean/flag column exists (e.g. 'helicopter' is BOOLEAN or VARCHAR, and user asks for helicopter accidents),
+     strictly filter: WHERE "helicopter" = TRUE (or "helicopter" = 1).
+   - If asking for airplanes and 'airplane' is a column: WHERE "airplane" = TRUE.
+   - For averages, use ROUND(AVG("<col>"), 2).
+6. For counting: use COUNT(*).
+7. For string searches: use ILIKE '%value%' or UPPER(col) LIKE '%VALUE%' for case-insensitive matching.
+8. For ordering: use ORDER BY <col> DESC/ASC LIMIT <n>.
+9. Output ONLY a valid JSON object with the following schema:
 {{
   "status": "success" | "data_not_available",
   "sql": "SELECT ...",
@@ -193,85 +200,82 @@ class SQLAgent:
                         score += 8
                     elif any(part in tok for tok in q_tokens if len(part) > 3):
                         score += 3
+                # Substring matching for composite column names (e.g. 'state' in 'stateofoccurrence')
+                for tok in q_tokens:
+                    if len(tok) >= 4 and tok in c_clean:
+                        score += 10
                 if score > best_score:
                     best_score = score
                     best_col = c
             return best_col, best_score
 
-        # Check for count queries
-        if re.search(r"\b(how many|total count|count of|number of records|number of rows|total records|total rows|how many rows)\b", q):
-            # Check for value match in text columns
-            for row in sample_rows:
-                for k, v in row.items():
-                    if v and isinstance(v, str) and len(v) >= 3:
-                        val_str = str(v).strip()
-                        if val_str.lower() in q:
-                            sql = f'SELECT COUNT(*) AS matching_records FROM "{table_name}" WHERE UPPER("{k}") LIKE \'%{val_str.upper()}%\''
-                            return sql, f"Count records where {k} matches '{val_str}'", "number"
+        # Filters detection
+        where_clauses = []
+        if "helicopter" in col_names and "helicopter" in q:
+            where_clauses.append('"helicopter" = true')
+        elif "airplane" in col_names and "airplane" in q:
+            where_clauses.append('"airplane" = true')
 
-            # Check if group by is requested (e.g., "count by <column>")
-            if re.search(r"\b(by|per|each)\b", q):
-                group_col, score = match_col(text_cols)
-                if group_col and score >= 3:
-                    sql = f'SELECT "{group_col}", COUNT(*) AS count FROM "{table_name}" GROUP BY "{group_col}" ORDER BY count DESC LIMIT 15'
-                    return sql, f"Count breakdown by {group_col}", "table"
+        if "fatalities" in col_names and ("fatal" in q or "fatalities" in q) and not re.search(r"\b(average|mean|avg|how many fatalities)\b", q):
+            where_clauses.append('"fatalities" > 0')
 
-            # Plain total records count
-            return f'SELECT COUNT(*) AS total_records FROM "{table_name}"', "Total record count", "number"
+        # Value matching from sample rows
+        for row in sample_rows:
+            for k, v in row.items():
+                if v and isinstance(v, str) and len(v) >= 3:
+                    val_str = str(v).strip()
+                    if val_str.lower() in q:
+                        where_clauses.append(f'UPPER("{k}") LIKE \'%{val_str.upper()}%\'')
 
-        # Check for average / mean queries
+        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        # Group-by ranking queries: "Which <entity> had the highest/most/lowest..."
+        is_ranking = bool(re.search(r"\b(highest|most|lowest|least|maximum|max|minimum|min|greatest|top|worst)\b", q))
+        is_count_rank = is_ranking and (bool(re.search(r"\b(number of|count of|accidents|crashes|records|events|incidents)\b", q)) or "which" in q or "what" in q)
+        if is_count_rank:
+            order_dir = "ASC" if re.search(r"\b(lowest|least|minimum|min)\b", q) else "DESC"
+            entity_col, score = match_col([c for c in col_names if c not in ["helicopter", "airplane", "class"]])
+            if entity_col and score >= 3:
+                sql = f'SELECT "{entity_col}", COUNT(*) AS accident_count FROM "{table_name}"{where_sql} GROUP BY "{entity_col}" ORDER BY accident_count {order_dir} LIMIT 1'
+                return sql, f"{entity_col} with {order_dir} accident count", "table"
+
+        # Average / Mean queries
         if re.search(r"\b(average|mean|avg)\b", q):
-            best_num, score = match_col(numeric_cols)
+            best_num, score = match_col([c for c in numeric_cols if c != "year"])
             if best_num and score >= 3:
                 if re.search(r"\b(by|per|for each)\b", q):
                     best_cat, cat_score = match_col(text_cols)
                     if best_cat and cat_score >= 3:
-                        sql = f'SELECT "{best_cat}", ROUND(AVG("{best_num}"), 2) AS "avg_{best_num}" FROM "{table_name}" GROUP BY "{best_cat}" ORDER BY "avg_{best_num}" DESC LIMIT 10'
+                        sql = f'SELECT "{best_cat}", ROUND(AVG("{best_num}"), 2) AS "avg_{best_num}" FROM "{table_name}"{where_sql} GROUP BY "{best_cat}" ORDER BY "avg_{best_num}" DESC LIMIT 10'
                         return sql, f"Average {best_num} grouped by {best_cat}", "table"
-                return f'SELECT ROUND(AVG("{best_num}"), 2) AS "average_{best_num}" FROM "{table_name}"', f"Calculate average {best_num}", "number"
+                return f'SELECT ROUND(AVG("{best_num}"), 2) AS "average_{best_num}" FROM "{table_name}"{where_sql}', f"Calculate average {best_num}", "number"
 
-        # Check for maximum / highest / top / fastest / slowest
-        if re.search(r"\b(highest|maximum|max|top|fastest|longest|most|largest|greatest)\b", q):
-            best_num, score = match_col(numeric_cols)
+        # Total Count queries
+        if re.search(r"\b(how many|total count|count of|number of records|number of rows|total records|total rows|how many rows|count)\b", q):
+            if re.search(r"\b(by|per|each)\b", q):
+                group_col, score = match_col(text_cols)
+                if group_col and score >= 3:
+                    sql = f'SELECT "{group_col}", COUNT(*) AS count FROM "{table_name}"{where_sql} GROUP BY "{group_col}" ORDER BY count DESC LIMIT 15'
+                    return sql, f"Count breakdown by {group_col}", "table"
+            return f'SELECT COUNT(*) AS total_records FROM "{table_name}"{where_sql}', "Total record count", "number"
+
+        # Direct column extremes (non-count numeric)
+        if is_ranking:
+            order_dir = "ASC" if re.search(r"\b(lowest|least|minimum|min)\b", q) else "DESC"
+            best_num, score = match_col([c for c in numeric_cols if c != "year"])
             if best_num and score >= 3:
                 best_text, _ = match_col(text_cols)
                 select_clause = f'"{best_text}", "{best_num}"' if best_text else f'*'
-                sql = f'SELECT {select_clause} FROM "{table_name}" ORDER BY "{best_num}" DESC LIMIT 5'
-                return sql, f"Top records by highest {best_num}", "table"
+                sql = f'SELECT {select_clause} FROM "{table_name}"{where_sql} ORDER BY "{best_num}" {order_dir} LIMIT 5'
+                return sql, f"Top records by {best_num}", "table"
 
-        # Check for minimum / lowest / slowest / smallest
-        if re.search(r"\b(lowest|minimum|min|slowest|least|smallest|shortest)\b", q):
-            best_num, score = match_col(numeric_cols)
-            if best_num and score >= 3:
-                best_text, _ = match_col(text_cols)
-                select_clause = f'"{best_text}", "{best_num}"' if best_text else f'*'
-                sql = f'SELECT {select_clause} FROM "{table_name}" ORDER BY "{best_num}" ASC LIMIT 5'
-                return sql, f"Records with lowest {best_num}", "table"
-
-        # Check for breakdown / distribution
+        # Distribution / breakdown
         if re.search(r"\b(breakdown|distribution|categories|summary)\b", q):
             best_cat, score = match_col(text_cols)
             if best_cat and score >= 3:
-                sql = f'SELECT "{best_cat}", COUNT(*) AS count FROM "{table_name}" GROUP BY "{best_cat}" ORDER BY count DESC LIMIT 15'
+                sql = f'SELECT "{best_cat}", COUNT(*) AS count FROM "{table_name}"{where_sql} GROUP BY "{best_cat}" ORDER BY count DESC LIMIT 15'
                 return sql, f"Distribution breakdown of {best_cat}", "table"
 
-        # Check for specific value filtering from sample rows
-        for row in sample_rows:
-            for k, v in row.items():
-                if v and isinstance(v, str) and len(v) >= 3:
-                    if v.lower() in q:
-                        sql = f'SELECT * FROM "{table_name}" WHERE UPPER("{k}") LIKE \'%{v.upper()}%\' LIMIT 10'
-                        return sql, f"Filter by {k} matching '{v}'", "table"
-
-        # If question asks about specific words and none matched schema columns, do not guess!
-        domain_keywords = [w for w in q_tokens if len(w) > 3 and w not in ["show", "give", "what", "which", "list", "tell", "data", "table", "record", "records"]]
-        if domain_keywords and not any(match_col(col_names)[1] > 0 for _ in [0]):
-            return None, "Requested attributes not found in schema", "table"
-
-        # Clean preview of the table if user asks to see records or sample
-        if re.search(r"\b(show|view|sample|preview|list|all)\b", q):
-            return f'SELECT * FROM "{table_name}" LIMIT 10', "Dataset records preview", "table"
-
-        return None, "Could not map question to dataset schema", "table"
+        return f'SELECT * FROM "{table_name}"{where_sql} LIMIT 10', "Dataset records preview", "table"
 
 sql_agent = SQLAgent()

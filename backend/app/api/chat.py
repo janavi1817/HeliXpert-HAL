@@ -11,6 +11,7 @@ from app.database.duckdb_manager import duckdb_manager
 from app.agents.sql_agent import sql_agent
 from app.agents.answer_agent import answer_agent
 from app.agents.vision_agent import vision_agent
+from app.agents.query_router import query_router
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -28,12 +29,13 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
     Precision Multi-Modal QA & Text-to-SQL Pipeline:
     1. If image_id is provided: Analyzes uploaded image with Gemini Vision
     2. If dataset question:
-       a. Dynamically inspects table schema from DuckDB
-       b. SQL Agent generates read-only DuckDB SQL using Gemini
-       c. If requested information is unavailable in schema, clearly informs user
+       a. Query Router classifies structured data queries (single source of truth = DuckDB)
+       b. Dynamically inspects table schema from DuckDB
+       c. SQL Agent generates read-only DuckDB SQL using schema reflection
        d. SQL Validator verifies read-only safety
        e. DuckDB executes query against actual data
-       f. Answer Agent synthesizes grounded response in requested language
+       f. RAG retrieves optional contextual support (labeled as contextual, never overriding DuckDB)
+       g. Answer Agent synthesizes grounded response with Answer Validation in requested mode
     3. Saves message history
     """
     question = req.question.strip()
@@ -132,7 +134,10 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
     schema = duckdb_manager.get_table_schema(table_name)
     sample_rows = duckdb_manager.fetch_sample_rows(table_name, limit=3)
 
-    # 1. SQL Generation Step (Dynamic Schema Inspection)
+    # 1. Query Router: Classify query (Rule #7)
+    route_info = query_router.classify(question=question, columns=schema)
+
+    # 2. Text-to-SQL Generation Step (Dynamic Schema Inspection)
     sql_response = sql_agent.generate_sql(
         question=question,
         table_name=table_name,
@@ -140,7 +145,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         sample_rows=sample_rows
     )
 
-    # 2. Check if requested data is unavailable in the schema
+    # 3. Check if requested data is unavailable in the schema
     if sql_response["status"] == "data_not_available":
         reason = sql_response.get("reason", "The requested columns or fields are not present in this dataset.")
         
@@ -172,7 +177,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
 
     generated_sql = sql_response["sql"]
 
-    # 3. Execute Query against DuckDB
+    # 4. Execute Query in DuckDB (Single Source of Truth)
     try:
         columns, result_rows = duckdb_manager.execute_read_only(generated_sql, max_rows=100)
     except Exception as e:
@@ -185,16 +190,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             "language": req.language or "en"
         }
 
-    # 4. Answer Generation Step (grounded strictly in actual DuckDB result)
-    answer_text = answer_agent.generate_response(
-        question=question,
-        sql=generated_sql,
-        result_rows=result_rows,
-        mode=req.mode or "nlp",
-        language=req.language or "en"
-    )
-
-    # 5. Save Conversation & Message History
+    # 5. Manage Conversation ID
     conv_id = req.conversation_id
     conversation = None
     if conv_id:
@@ -211,8 +207,9 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         db.add(conversation)
         db.flush()
 
-    # 6. RAG Semantic Retrieval & Transparency Metadata Generation
+    # 6. RAG Semantic Retrieval (Contextual Support Only; Never overrides DuckDB)
     rag_metadata = None
+    rag_context_str = ""
     try:
         from app.services.rag_service import rag_service
         from app.services.dataset_service import dataset_service
@@ -231,8 +228,20 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
             top_k=3,
             used_duckdb=True
         )
+        if rag_metadata and rag_metadata.get("retrieved_chunks"):
+            rag_context_str = "\n".join([c["content"] for c in rag_metadata["retrieved_chunks"][:2]])
     except Exception:
         rag_metadata = None
+
+    # 7. Answer Generation & Validation (Both modes consume the EXACT same DuckDB result rows)
+    answer_text = answer_agent.generate_response(
+        question=question,
+        sql=generated_sql,
+        result_rows=result_rows,
+        mode=req.mode or "nlp",
+        language=req.language or "en",
+        rag_context=rag_context_str
+    )
 
     user_msg = Message(
         id=str(uuid.uuid4()),
@@ -259,7 +268,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
     db.commit()
 
     response_payload = {
-        "mode": req.mode,
+        "mode": req.mode or "nlp",
         "question": question,
         "answer": answer_text,
         "language": req.language or "en",
@@ -268,7 +277,7 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
         "rag_metadata": rag_metadata
     }
 
-    # In Data Query mode, show the EXACT SQL that was actually executed
+    # In Data Query mode, show the EXACT SQL and result rows that were executed
     if req.mode == "rag" or "sql" in question.lower():
         response_payload["sql"] = generated_sql
         response_payload["result"] = result_rows[:15] if result_rows else []

@@ -196,12 +196,14 @@ class RAGService:
                 "source": dataset_name,
                 "location": f"Row #{chunk['row_num']}",
                 "content": chunk["text"],
-                "raw_data": chunk.get("data")
+                "raw_data": chunk.get("data"),
+                "note": "Retrieved for contextual relevance; not used as the source of the numerical result."
             })
 
         return {
             "used_rag": True,
             "used_duckdb": used_duckdb,
+            "context_note": "Retrieved for contextual relevance; not used as the source of the numerical result.",
             "session_id": session_id,
             "query_id": query_id,
             "timestamp": timestamp,
