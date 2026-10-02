@@ -286,6 +286,8 @@ export default function ChatWindow({
                 </div>
               </div>
             </motion.div>
+          )}
+
           {/* Subtle follow-up dynamic prompt pills */}
           {!isLoading && suggestedPrompts.length > 0 && (
             <div className="pt-3 pb-1">
