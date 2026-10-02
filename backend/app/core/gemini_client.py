@@ -16,9 +16,9 @@ class GeminiClient:
     """
 
     def __init__(self):
-        # Candidate model waterfall in priority order
-        primary_model = getattr(settings, "GEMINI_MODEL", "gemini-3.8-flash")
-        candidates = [primary_model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"]
+        # Candidate model waterfall in priority order (fastest & tested first)
+        primary_model = getattr(settings, "GEMINI_MODEL", "gemini-3-flash-preview")
+        candidates = [primary_model, "gemini-3-flash-preview", "gemini-flash-latest", "gemma-4-26b-a4b-it", "gemini-3.8-flash"]
         # Deduplicate while preserving order
         self.model_candidates = []
         for m in candidates:
@@ -26,14 +26,14 @@ class GeminiClient:
                 self.model_candidates.append(m)
 
     def get_api_key(self) -> str:
-        key = getattr(settings, "GEMINI_API_KEY", "") or getattr(settings, "GOOGLE_API_KEY", "")
+        key = getattr(settings, "GOOGLE_API_KEY", "") or getattr(settings, "GEMINI_API_KEY", "")
         if not key:
-            key = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
+            key = os.getenv("GOOGLE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
         return key.strip() if key else ""
 
     def is_configured(self) -> bool:
         key = self.get_api_key()
-        return len(key) > 20 and not key.startswith("YOUR_")
+        return bool(key and len(key) > 15 and not key.upper().startswith("YOUR_"))
 
     def call_api(
         self,
@@ -41,7 +41,8 @@ class GeminiClient:
         system_instruction: Optional[str] = None,
         temperature: float = 0.1,
         response_mime_type: Optional[str] = None,
-        timeout: int = 15
+        timeout: int = 12,
+        models_override: Optional[List[str]] = None
     ) -> Optional[str]:
         """
         Calls Gemini API with automatic fallback across supported model candidates.
@@ -50,7 +51,8 @@ class GeminiClient:
         if not api_key:
             return None
 
-        for model_name in self.model_candidates:
+        models_to_try = models_override or self.model_candidates
+        for model_name in models_to_try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             
             payload: Dict[str, Any] = {
@@ -142,11 +144,14 @@ class GeminiClient:
                 ]
             }
         ]
+        # Vision-capable models only (exclude Gemma text models)
+        vision_models = [m for m in self.model_candidates if not m.startswith("gemma")]
         return self.call_api(
             contents=contents,
             system_instruction=system_instruction,
             temperature=temperature,
-            timeout=timeout
+            timeout=timeout,
+            models_override=vision_models
         )
 
     @staticmethod

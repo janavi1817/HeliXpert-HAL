@@ -62,6 +62,18 @@ class DuckDBManager:
                     self._conn.execute(f'CREATE OR REPLACE TABLE "{safe_table_name}" AS SELECT * FROM temp_excel_df')
                     self._conn.unregister("temp_excel_df")
 
+    def table_exists(self, table_name: str) -> bool:
+        """Check if a table exists in the DuckDB instance"""
+        with self._lock:
+            safe_table_name = "".join(c for c in table_name if c.isalnum() or c == "_")
+            try:
+                res = self._conn.execute(
+                    f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{safe_table_name}'"
+                ).fetchone()
+                return bool(res and res[0] > 0)
+            except Exception:
+                return False
+
     def get_table_schema(self, table_name: str) -> List[Dict[str, str]]:
         """Get column names and types for a table"""
         with self._lock:

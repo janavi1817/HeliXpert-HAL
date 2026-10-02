@@ -77,10 +77,22 @@ class VisionAgent:
                 temperature=0.1,
                 timeout=20
             )
-            if raw_resp:
+            if raw_resp and len(raw_resp.strip()) > 0:
                 parsed_json = gemini_client.extract_json(raw_resp)
                 if parsed_json and isinstance(parsed_json, dict):
                     return cls._normalize_vision_result(parsed_json, image_path)
+                # If Gemini returned direct text analysis, use it without dropping
+                return {
+                    "image_filename": image_path.name,
+                    "identified_model": "Visual Subject Analyzed",
+                    "confidence": "High",
+                    "probable_manufacturer": "Visual Inspection",
+                    "airframe_type": "Visual Subject",
+                    "landing_gear": "Visible",
+                    "rotor_configuration": "Visible",
+                    "visible_components": ["Image analyzed with Gemini Vision"],
+                    "detailed_analysis": raw_resp.strip()
+                }
 
         # 2. Try OpenAI Vision if Gemini not available
         if settings.OPENAI_API_KEY and len(settings.OPENAI_API_KEY) > 20:

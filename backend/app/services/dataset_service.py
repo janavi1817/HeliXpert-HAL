@@ -47,8 +47,21 @@ class DatasetService:
         if df.empty or len(df.columns) == 0:
             raise HTTPException(status_code=400, detail="The dataset is empty or has no columns.")
 
-        # Sanitize column names for DuckDB (replace special chars, strip whitespace)
-        df.columns = [str(col).strip().replace(" ", "_").replace("-", "_").lower() for col in df.columns]
+        # Sanitize column names for DuckDB (replace special chars, strip whitespace, avoid duplicate/empty names)
+        import re
+        sanitized_cols = []
+        seen_cols = {}
+        for i, col in enumerate(df.columns):
+            clean = re.sub(r'[^a-zA-Z0-9_]+', '_', str(col).strip()).strip('_').lower()
+            if not clean:
+                clean = f"col_{i+1}"
+            if clean in seen_cols:
+                seen_cols[clean] += 1
+                clean = f"{clean}_{seen_cols[clean]}"
+            else:
+                seen_cols[clean] = 0
+            sanitized_cols.append(clean)
+        df.columns = sanitized_cols
 
         dataset_id = str(uuid.uuid4())
         table_name = f"t_{dataset_id.replace('-', '_')}"

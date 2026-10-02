@@ -107,6 +107,28 @@ def process_chat(req: ChatRequest, db: Session = Depends(get_db)):
 
     # Retrieve live schema and sample rows from DuckDB
     table_name = dataset.duckdb_table_name
+    if not duckdb_manager.table_exists(table_name) and dataset.file_path and Path(dataset.file_path).exists():
+        from app.services.dataset_service import dataset_service
+        try:
+            import re
+            df = dataset_service.load_df_from_file(Path(dataset.file_path), dataset.file_type)
+            sanitized_cols = []
+            seen_cols = {}
+            for i, col in enumerate(df.columns):
+                clean = re.sub(r'[^a-zA-Z0-9_]+', '_', str(col).strip()).strip('_').lower()
+                if not clean:
+                    clean = f"col_{i+1}"
+                if clean in seen_cols:
+                    seen_cols[clean] += 1
+                    clean = f"{clean}_{seen_cols[clean]}"
+                else:
+                    seen_cols[clean] = 0
+                sanitized_cols.append(clean)
+            df.columns = sanitized_cols
+            duckdb_manager.create_table_from_df(table_name, df)
+        except Exception:
+            pass
+
     schema = duckdb_manager.get_table_schema(table_name)
     sample_rows = duckdb_manager.fetch_sample_rows(table_name, limit=3)
 
