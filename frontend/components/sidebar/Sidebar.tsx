@@ -229,10 +229,6 @@ export default function Sidebar({
                 <div className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>
                   Janavi N S
                 </div>
-                <div className="text-[10px] flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                  Free Plan
-                </div>
               </div>
             )}
           </div>
